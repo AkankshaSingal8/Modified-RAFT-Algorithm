@@ -189,8 +189,12 @@ class Node():
         # till everyone has voted
         # or I am the leader
         for voter in self.fellow:
-            threading.Thread(target=self.ask_for_vote,
+            try:
+                threading.Thread(target=self.ask_for_vote,
                             args=(voter, self.term)).start()
+            except:
+                continue
+
 
     # request vote to other servers during given election term
     def ask_for_vote(self, voter, term):
@@ -261,57 +265,70 @@ class Node():
             self.handle_put(self.staged)
 
         for each in self.fellow:
-            t = threading.Thread(target=self.send_heartbeat, args=(each, ))
-            t.start()
+            try:
+                t = threading.Thread(target=self.send_heartbeat, args=(each, ))
+                t.start()
+            except:
+                continue
 
     def update_follower_commitIdx(self, follower):
-        channel = grpc.insecure_channel(follower)
-        stub = raft_pb2_grpc.RaftStub(channel)
-        message = raft_pb2.AEMessage()
-        message.term = self.term
-        message.addr = self.addr
-        message.action = 'commit'
-        message.payload.act = self.log[-1]['act']
-        message.payload.key = self.log[-1]['key']
-        message.commitIdx = self.commitIdx
-        if self.log[-1]['value']:
-            message.payload.value = self.log[-1]['value']
-        reply = stub.AppendEntries(message)
+        try:
+            channel = grpc.insecure_channel(follower)
+            stub = raft_pb2_grpc.RaftStub(channel)
+            message = raft_pb2.AEMessage()
+            message.term = self.term
+            message.addr = self.addr
+            message.action = 'commit'
+            message.payload.act = self.log[-1]['act']
+            message.payload.key = self.log[-1]['key']
+            message.commitIdx = self.commitIdx
+            if self.log[-1]['value']:
+                message.payload.value = self.log[-1]['value']
+            reply = stub.AppendEntries(message)
+        except:
+            return
 
     def send_heartbeat(self, follower):
         # check if the new follower have same commit index, else we tell them to update to our log level
-        if self.log:
-            self.update_follower_commitIdx(follower)
+        try: 
+            if self.log:
+                self.update_follower_commitIdx(follower)
 
 
-        while self.status == LEADER:
-            start = time.time()
-            channel = grpc.insecure_channel(follower)
-            stub = raft_pb2_grpc.RaftStub(channel)
-
-            ping = raft_pb2.JoinRequest()
-            #print(ping)
-            if ping:
+            while self.status == LEADER:
                 try:
-                    if follower not in self.fellow:
-                        self.fellow.append(follower)
-                    message = raft_pb2.AEMessage()
-                    message.term = self.term
-                    message.addr = self.addr
-                    reply = stub.AppendEntries(message)
-                    if reply:
-                        self.heartbeat_reply_handler(reply.term, reply.commitIdx)
-                    delta = time.time() - start
-                    # keep the heartbeat constant even if the network speed is varying
-                    time.sleep((HB_TIME - delta) / 1000)
+
+                    start = time.time()
+                    channel = grpc.insecure_channel(follower)
+                    stub = raft_pb2_grpc.RaftStub(channel)
+
+                    ping = raft_pb2.JoinRequest()
+                    #print(ping)
+                    if ping:
+                        try:
+                            if follower not in self.fellow:
+                                self.fellow.append(follower)
+                            message = raft_pb2.AEMessage()
+                            message.term = self.term
+                            message.addr = self.addr
+                            reply = stub.AppendEntries(message)
+                            if reply:
+                                self.heartbeat_reply_handler(reply.term, reply.commitIdx)
+                            delta = time.time() - start
+                            # keep the heartbeat constant even if the network speed is varying
+                            time.sleep((HB_TIME - delta) / 1000)
+                        except:
+                            continue
+                    else:
+                        for index in range(len(self.fellow)):
+                            if self.fellow[index] == follower:
+                                self.fellow.pop(index)
+                                print('Server {} lost connect'.format(follower))
+                                break
                 except:
                     continue
-            else:
-                for index in range(len(self.fellow)):
-                    if self.fellow[index] == follower:
-                        self.fellow.pop(index)
-                        print('Server {} lost connect'.format(follower))
-                        break
+        except:
+            return
 
     # we may step down when get replied
     def heartbeat_reply_handler(self, term, commitIdx):
