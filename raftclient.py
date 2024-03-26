@@ -54,17 +54,21 @@ def send_request(action, key, val, ip_list):
                 response = stub.PutRequest(request)
             else:
                 invalid_input()
-
+            print('response contents', response.code, response.payload.message, response.payload.act, response.payload.key, response.payload.value)
             # Check response code for success or need to redirect to leader
             if response.code == 'success':
                 print("Response:", response)
                 break  # Success, exit loop
             elif response.code == 'fail' and response.payload:  # Assuming response includes leader info on failure
-                leader_addr = response.payload.message
-                print(leader_addr)
-                leader_ip_idx = int(leader_addr[-1])
-                print(leader_ip_idx)
-                print(f"Redirecting to leader at {ip_list[leader_ip_idx]}")
+                try:
+                    leader_addr = response.payload.message
+                    print(leader_addr)
+                    leader_ip_idx = int(leader_addr[-1])
+                    print(leader_ip_idx)
+                    print(f"Redirecting to leader at {ip_list[leader_ip_idx]}")
+                except:
+                    print("Invalid leader info in response:", response)
+                    break
             else:
                 print("Operation failed:", response)
                 break  # Fail without leader info, exit loop

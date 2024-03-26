@@ -408,26 +408,29 @@ class Node():
     # if it is a comit it releases the lock
     def spread_update(self, message, confirmations=None, lock=None):
         for i, each in enumerate(self.fellow):
-            channel = grpc.insecure_channel(each)
-            stub = raft_pb2_grpc.RaftStub(channel)
-            m = raft_pb2.AEMessage()
-            m.term = message['term']
-            m.addr = message['addr']
-            if message['payload'] is not None:
-                #print(message['payload'])
-                m.payload.act = message['payload']['act']
-                m.payload.key = message['payload']['key']
-                m.payload.value = message['payload']['value']
-            #m.action = 'commit'
-            if message['action']:
-                m.action = message['action']
-            m.commitIdx = self.commitIdx
-            r = stub.AppendEntries(m)
-            if r and confirmations:
-                # print(f" - - {message['action']} by {each}")
-                confirmations[i] = True
-                log_dir = f'./logs_node_{each[-1]}'
-                write_to_log(f"SET {m.payload.key} {m.payload.key} {self.term}\n", log_dir)
+            try:
+                channel = grpc.insecure_channel(each)
+                stub = raft_pb2_grpc.RaftStub(channel)
+                m = raft_pb2.AEMessage()
+                m.term = message['term']
+                m.addr = message['addr']
+                if message['payload'] is not None:
+                    #print(message['payload'])
+                    m.payload.act = message['payload']['act']
+                    m.payload.key = message['payload']['key']
+                    m.payload.value = message['payload']['value']
+                #m.action = 'commit'
+                if message['action']:
+                    m.action = message['action']
+                m.commitIdx = self.commitIdx
+                r = stub.AppendEntries(m)
+                if r and confirmations:
+                    # print(f" - - {message['action']} by {each}")
+                    confirmations[i] = True
+                    log_dir = f'./logs_node_{each[-1]}'
+                    write_to_log(f"SET {m.payload.key} {m.payload.key} {self.term}\n", log_dir)
+            except:
+                continue
         if lock:
             lock.release()
 
