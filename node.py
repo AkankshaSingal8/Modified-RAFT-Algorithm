@@ -1,3 +1,4 @@
+import os
 import threading
 import time
 import grpc
@@ -35,10 +36,17 @@ def send(addr, route, message):
     else:
         return None
 
-def debugger(context, logid=1):
-    f = open('log.txt','w')
-    f.write(context)
-    f.close()
+def write_to_log(context, log_dir):
+    with open(os.path.join(log_dir, 'logs.txt'), 'a+') as f:
+        f.write(context)
+
+def write_to_metadata(context, log_dir):
+    with open(os.path.join(log_dir, 'metadata.txt'), 'a+') as f:
+        f.write(context)
+
+def write_to_dump(context, log_dir):
+    with open(os.path.join(log_dir, 'dump.txt'), 'a+') as f:
+        f.write(context)
 
 def terminate(id):
     print(f"Server {id} is shutting down...")
@@ -147,6 +155,7 @@ class Node():
         self.capacity = 3
         self.cache = LRUCache(capacity=self.capacity)
         self.vote_requests_sent = set()
+        self.log_dir = f'./logs_node_{self.addr[-1]}'
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
@@ -154,6 +163,7 @@ class Node():
         self.voteCount += 1
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
             print(f"{self.addr} becomes the leader of term {self.term}")
+            write_to_log(f'NO-OP {self.term}', self.log_dir)
             self.status = LEADER
             self.startHeartBeat()
 
@@ -399,7 +409,6 @@ class Node():
     # if it is a comit it releases the lock
     def spread_update(self, message, confirmations=None, lock=None):
         for i, each in enumerate(self.fellow):
-
             channel = grpc.insecure_channel(each)
             stub = raft_pb2_grpc.RaftStub(channel)
             m = raft_pb2.AEMessage()
@@ -458,7 +467,8 @@ class Node():
         can_delete = self.commit()
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
-        print("majority reached, replied to client, sending message to commit, message:",commit_message)
+        print("majority reached, replied to client, sending message to commit, message:", commit_message)
+        write_to_log(f'SET {payload.key} {payload.value} {self.term}', self.log_dir)
         return can_delete
 
     # put staged key-value pair into local database

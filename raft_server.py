@@ -1,3 +1,4 @@
+import os
 from node import Node
 from node import FOLLOWER, LEADER
 import sys
@@ -29,13 +30,13 @@ class Raft(raft_pb2_grpc.RaftServicer):
             if result:
                 response.code='success'
         elif n.status == FOLLOWER:
-            print('redirect to leader ',n.leader)
+            print('redirect to leader ', n.leader)
             response.payload.message = n.leader
             response.payload.act = payload['act']
             response.payload.key = payload['key']
             response.payload.value = payload['value']
 
-        #print('put response:',response)
+        # print('put response:',response)
         return response
 
     def GetRequest(self, request, context):
@@ -130,5 +131,8 @@ if __name__ == "__main__":
             for ip in f:
                 ip_list.append(ip.strip())
         my_ip = ip_list.pop(index)
-        print(' * this is server Number',index)
+        print(' * this is server Number', index)
+        log_directory = f'./logs_node_{index}'
+        if not os.path.exists(log_directory):
+            os.makedirs(log_directory)
         GRPCserver(ip_list, my_ip)
