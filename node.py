@@ -163,7 +163,7 @@ class Node():
         self.voteCount += 1
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
             print(f"{self.addr} becomes the leader of term {self.term}")
-            write_to_log(f'NO-OP {self.term}', self.log_dir)
+            write_to_log(f'NO-OP {self.term}\n', self.log_dir)
             self.status = LEADER
             self.startHeartBeat()
 
@@ -393,7 +393,6 @@ class Node():
         key = payload["key"]
         act = payload["act"]
         if act == 'get':
-            print("getting", payload)
             cache_res = self.cache.get(key)
             if cache_res is not None:
                 print('result in cache')
@@ -427,6 +426,8 @@ class Node():
             if r and confirmations:
                 # print(f" - - {message['action']} by {each}")
                 confirmations[i] = True
+                log_dir = f'./logs_node_{each[-1]}'
+                write_to_log(f"SET {m.payload.key} {m.payload.key} {self.term}\n", log_dir)
         if lock:
             lock.release()
 
@@ -468,7 +469,7 @@ class Node():
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
         print("majority reached, replied to client, sending message to commit, message:", commit_message)
-        write_to_log(f'SET {payload} {self.term}', self.log_dir)
+        write_to_log(f"SET {payload['key']} {payload['value']} {self.term}\n", self.log_dir)
         return can_delete
 
     # put staged key-value pair into local database
