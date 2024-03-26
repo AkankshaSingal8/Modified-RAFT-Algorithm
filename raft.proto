@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-service KVServer{
+service Raft {
 	rpc Join(JoinRequest) returns (JoinResponse) {}
 	rpc PutRequest(PutMessage) returns (PutReply) {}
 	rpc GetRequest(GetMessage) returns (GetReply) {}

@@ -3,8 +3,8 @@ from node import FOLLOWER, LEADER
 import sys
 import grpc
 from concurrent import futures
-import mykvserver_pb2
-import mykvserver_pb2_grpc
+import raft_pb2
+import raft_pb2_grpc
 import time
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
@@ -13,9 +13,9 @@ my_host = None
 my_port = None
 n = None
 
-class KVServer(mykvserver_pb2_grpc.KVServerServicer):
+class Raft(raft_pb2_grpc.RaftServicer):
     def Join(self, request, context):
-        response = mykvserver_pb2.JoinResponse(ok=True)
+        response = raft_pb2.JoinResponse(ok=True)
         return response
     def PutRequest(self, request, context):
         #type = request.type
@@ -24,7 +24,7 @@ class KVServer(mykvserver_pb2_grpc.KVServerServicer):
         payload['act'] = request.payload.act
         payload['key'] = request.payload.key
         payload['value'] = request.payload.value
-        response = mykvserver_pb2.PutReply()
+        response = raft_pb2.PutReply()
         response.code = 'fail'
         if n.status == LEADER:
             #print('getting, request = ', request)
@@ -47,7 +47,7 @@ class KVServer(mykvserver_pb2_grpc.KVServerServicer):
         payload['act'] = request.payload.act
         payload['key'] = request.payload.key
         payload['value'] = request.payload.value
-        response = mykvserver_pb2.GetReply()
+        response = raft_pb2.GetReply()
         response.code = 'fail'
         if n.status == LEADER:
             #print('getting, request = ', request)
@@ -74,7 +74,7 @@ class KVServer(mykvserver_pb2_grpc.KVServerServicer):
         payload['act'] = request.payload.act
         payload['key'] = request.payload.key
         payload['value'] = 'None'
-        response = mykvserver_pb2.DelReply()
+        response = raft_pb2.DelReply()
         response.code = 'fail'
         if n.status == LEADER:
             #print('del, request = ', request)
@@ -101,7 +101,7 @@ class KVServer(mykvserver_pb2_grpc.KVServerServicer):
         #debugger (str(term)+str(commitIdx)+str(staged))
         choice, term = n.decide_vote(term, commitIdx, staged)
         #print(choice,term)
-        message = mykvserver_pb2.VoteReply(choice=choice,term=term)
+        message = raft_pb2.VoteReply(choice=choice,term=term)
         return message
 
     def HeartBeat(self, request, context):
@@ -121,7 +121,7 @@ class KVServer(mykvserver_pb2_grpc.KVServerServicer):
         if request.commitIdx:
             msg['commitIdx'] = request.commitIdx
         term,commitIdx = n.heartbeat_follower(msg)
-        reply = mykvserver_pb2.HBReply()
+        reply = raft_pb2.HBReply()
         reply.term = term
         reply.commitIdx = commitIdx
         return reply
@@ -135,7 +135,7 @@ def GRPCserver(ip_list,my_ip):
     global n
     n = Node(ip_list, my_ip)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    mykvserver_pb2_grpc.add_KVServerServicer_to_server(KVServer(),server)
+    raft_pb2_grpc.add_RaftServicer_to_server(Raft(),server)
     server.add_insecure_port(my_ip)
     time.sleep(5)
     server.start()

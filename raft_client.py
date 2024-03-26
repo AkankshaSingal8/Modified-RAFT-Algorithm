@@ -1,7 +1,7 @@
 import sys
 import grpc
-import mykvserver_pb2
-import mykvserver_pb2_grpc
+import raft_pb2
+import raft_pb2_grpc
 
 def invalid_input():
     print("""Invalid Input Format!\n
@@ -19,10 +19,10 @@ if __name__ == "__main__":
     while True:
         channel = grpc.insecure_channel(addr)
         if len(sys.argv) == 4:
-            stub = mykvserver_pb2_grpc.KVServerStub(channel)
+            stub = raft_pb2_grpc.RaftStub(channel)
             response = None
             if action=='get' or action=='GET':
-                msg = mykvserver_pb2.GetMessage()
+                msg = raft_pb2.GetMessage()
                 msg.type = 'get'
                 msg.payload.act = 'get'
                 msg.payload.key = key
@@ -40,8 +40,8 @@ if __name__ == "__main__":
         elif len(sys.argv) == 5:
             val = sys.argv[4]
             if action=='put'or action=='PUT':
-                stub = mykvserver_pb2_grpc.KVServerStub(channel)
-                msg = mykvserver_pb2.PutMessage()
+                stub = raft_pb2_grpc.RaftStub(channel)
+                msg = raft_pb2.PutMessage()
                 msg.type = 'put'
                 msg.payload.act = 'put'
                 msg.payload.key = key

@@ -1,8 +1,8 @@
 import threading
 import time
 import grpc
-import mykvserver_pb2
-import mykvserver_pb2_grpc
+import raft_pb2
+import raft_pb2_grpc
 import random
 import requests
 
@@ -189,8 +189,8 @@ class Node():
         # need to include self.commitIdx, only up-to-date candidate could win
         #debugger (self.addr+'+'+voter)
         channel = grpc.insecure_channel(voter)
-        stub = mykvserver_pb2_grpc.KVServerStub(channel)
-        message = mykvserver_pb2.VoteMessage()
+        stub = raft_pb2_grpc.RaftStub(channel)
+        message = raft_pb2.VoteMessage()
         #debugger (stub.VoteRequest(message),2)
 
         message.term = term
@@ -258,8 +258,8 @@ class Node():
 
     def update_follower_commitIdx(self, follower):
         channel = grpc.insecure_channel(follower)
-        stub = mykvserver_pb2_grpc.KVServerStub(channel)
-        message = mykvserver_pb2.HBMessage()
+        stub = raft_pb2_grpc.RaftStub(channel)
+        message = raft_pb2.HBMessage()
         message.term = self.term
         message.addr = self.addr
         message.action = 'commit'
@@ -279,15 +279,15 @@ class Node():
         while self.status == LEADER:
             start = time.time()
             channel = grpc.insecure_channel(follower)
-            stub = mykvserver_pb2_grpc.KVServerStub(channel)
+            stub = raft_pb2_grpc.RaftStub(channel)
 
-            ping = mykvserver_pb2.JoinRequest()
+            ping = raft_pb2.JoinRequest()
             #print(ping)
             if ping:
                 try:
                     if follower not in self.fellow:
                         self.fellow.append(follower)
-                    message = mykvserver_pb2.HBMessage()
+                    message = raft_pb2.HBMessage()
                     message.term = self.term
                     message.addr = self.addr
                     reply = stub.HeartBeat(message)
@@ -405,8 +405,8 @@ class Node():
         for i, each in enumerate(self.fellow):
 
             channel = grpc.insecure_channel(each)
-            stub = mykvserver_pb2_grpc.KVServerStub(channel)
-            m = mykvserver_pb2.HBMessage()
+            stub = raft_pb2_grpc.RaftStub(channel)
+            m = raft_pb2.HBMessage()
             m.term = message['term']
             m.addr = message['addr']
             if message['payload'] is not None:

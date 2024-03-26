@@ -2,10 +2,10 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import mykvserver_pb2 as mykvserver__pb2
+import raft_pb2 as raft__pb2
 
 
-class KVServerStub(object):
+class RaftStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -15,48 +15,48 @@ class KVServerStub(object):
             channel: A grpc.Channel.
         """
         self.Join = channel.unary_unary(
-                '/KVServer/Join',
-                request_serializer=mykvserver__pb2.JoinRequest.SerializeToString,
-                response_deserializer=mykvserver__pb2.JoinResponse.FromString,
+                '/Raft/Join',
+                request_serializer=raft__pb2.JoinRequest.SerializeToString,
+                response_deserializer=raft__pb2.JoinResponse.FromString,
                 )
         self.PutRequest = channel.unary_unary(
-                '/KVServer/PutRequest',
-                request_serializer=mykvserver__pb2.PutMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.PutReply.FromString,
+                '/Raft/PutRequest',
+                request_serializer=raft__pb2.PutMessage.SerializeToString,
+                response_deserializer=raft__pb2.PutReply.FromString,
                 )
         self.GetRequest = channel.unary_unary(
-                '/KVServer/GetRequest',
-                request_serializer=mykvserver__pb2.GetMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.GetReply.FromString,
+                '/Raft/GetRequest',
+                request_serializer=raft__pb2.GetMessage.SerializeToString,
+                response_deserializer=raft__pb2.GetReply.FromString,
                 )
         self.DelRequest = channel.unary_unary(
-                '/KVServer/DelRequest',
-                request_serializer=mykvserver__pb2.DelMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.DelReply.FromString,
+                '/Raft/DelRequest',
+                request_serializer=raft__pb2.DelMessage.SerializeToString,
+                response_deserializer=raft__pb2.DelReply.FromString,
                 )
         self.VoteRequest = channel.unary_unary(
-                '/KVServer/VoteRequest',
-                request_serializer=mykvserver__pb2.VoteMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.VoteReply.FromString,
+                '/Raft/VoteRequest',
+                request_serializer=raft__pb2.VoteMessage.SerializeToString,
+                response_deserializer=raft__pb2.VoteReply.FromString,
                 )
         self.HeartBeat = channel.unary_unary(
-                '/KVServer/HeartBeat',
-                request_serializer=mykvserver__pb2.HBMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.HBReply.FromString,
+                '/Raft/HeartBeat',
+                request_serializer=raft__pb2.HBMessage.SerializeToString,
+                response_deserializer=raft__pb2.HBReply.FromString,
                 )
         self.SpreadLog = channel.unary_unary(
-                '/KVServer/SpreadLog',
-                request_serializer=mykvserver__pb2.LogMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.LogReply.FromString,
+                '/Raft/SpreadLog',
+                request_serializer=raft__pb2.LogMessage.SerializeToString,
+                response_deserializer=raft__pb2.LogReply.FromString,
                 )
         self.SpreadCommit = channel.unary_unary(
-                '/KVServer/SpreadCommit',
-                request_serializer=mykvserver__pb2.CommitMessage.SerializeToString,
-                response_deserializer=mykvserver__pb2.CommitReply.FromString,
+                '/Raft/SpreadCommit',
+                request_serializer=raft__pb2.CommitMessage.SerializeToString,
+                response_deserializer=raft__pb2.CommitReply.FromString,
                 )
 
 
-class KVServerServicer(object):
+class RaftServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def Join(self, request, context):
@@ -108,56 +108,56 @@ class KVServerServicer(object):
         raise NotImplementedError('Method not implemented!')
 
 
-def add_KVServerServicer_to_server(servicer, server):
+def add_RaftServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'Join': grpc.unary_unary_rpc_method_handler(
                     servicer.Join,
-                    request_deserializer=mykvserver__pb2.JoinRequest.FromString,
-                    response_serializer=mykvserver__pb2.JoinResponse.SerializeToString,
+                    request_deserializer=raft__pb2.JoinRequest.FromString,
+                    response_serializer=raft__pb2.JoinResponse.SerializeToString,
             ),
             'PutRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.PutRequest,
-                    request_deserializer=mykvserver__pb2.PutMessage.FromString,
-                    response_serializer=mykvserver__pb2.PutReply.SerializeToString,
+                    request_deserializer=raft__pb2.PutMessage.FromString,
+                    response_serializer=raft__pb2.PutReply.SerializeToString,
             ),
             'GetRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRequest,
-                    request_deserializer=mykvserver__pb2.GetMessage.FromString,
-                    response_serializer=mykvserver__pb2.GetReply.SerializeToString,
+                    request_deserializer=raft__pb2.GetMessage.FromString,
+                    response_serializer=raft__pb2.GetReply.SerializeToString,
             ),
             'DelRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.DelRequest,
-                    request_deserializer=mykvserver__pb2.DelMessage.FromString,
-                    response_serializer=mykvserver__pb2.DelReply.SerializeToString,
+                    request_deserializer=raft__pb2.DelMessage.FromString,
+                    response_serializer=raft__pb2.DelReply.SerializeToString,
             ),
             'VoteRequest': grpc.unary_unary_rpc_method_handler(
                     servicer.VoteRequest,
-                    request_deserializer=mykvserver__pb2.VoteMessage.FromString,
-                    response_serializer=mykvserver__pb2.VoteReply.SerializeToString,
+                    request_deserializer=raft__pb2.VoteMessage.FromString,
+                    response_serializer=raft__pb2.VoteReply.SerializeToString,
             ),
             'HeartBeat': grpc.unary_unary_rpc_method_handler(
                     servicer.HeartBeat,
-                    request_deserializer=mykvserver__pb2.HBMessage.FromString,
-                    response_serializer=mykvserver__pb2.HBReply.SerializeToString,
+                    request_deserializer=raft__pb2.HBMessage.FromString,
+                    response_serializer=raft__pb2.HBReply.SerializeToString,
             ),
             'SpreadLog': grpc.unary_unary_rpc_method_handler(
                     servicer.SpreadLog,
-                    request_deserializer=mykvserver__pb2.LogMessage.FromString,
-                    response_serializer=mykvserver__pb2.LogReply.SerializeToString,
+                    request_deserializer=raft__pb2.LogMessage.FromString,
+                    response_serializer=raft__pb2.LogReply.SerializeToString,
             ),
             'SpreadCommit': grpc.unary_unary_rpc_method_handler(
                     servicer.SpreadCommit,
-                    request_deserializer=mykvserver__pb2.CommitMessage.FromString,
-                    response_serializer=mykvserver__pb2.CommitReply.SerializeToString,
+                    request_deserializer=raft__pb2.CommitMessage.FromString,
+                    response_serializer=raft__pb2.CommitReply.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'KVServer', rpc_method_handlers)
+            'Raft', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class KVServer(object):
+class Raft(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
@@ -171,9 +171,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/Join',
-            mykvserver__pb2.JoinRequest.SerializeToString,
-            mykvserver__pb2.JoinResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/Join',
+            raft__pb2.JoinRequest.SerializeToString,
+            raft__pb2.JoinResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -188,9 +188,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/PutRequest',
-            mykvserver__pb2.PutMessage.SerializeToString,
-            mykvserver__pb2.PutReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/PutRequest',
+            raft__pb2.PutMessage.SerializeToString,
+            raft__pb2.PutReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -205,9 +205,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/GetRequest',
-            mykvserver__pb2.GetMessage.SerializeToString,
-            mykvserver__pb2.GetReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/GetRequest',
+            raft__pb2.GetMessage.SerializeToString,
+            raft__pb2.GetReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -222,9 +222,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/DelRequest',
-            mykvserver__pb2.DelMessage.SerializeToString,
-            mykvserver__pb2.DelReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/DelRequest',
+            raft__pb2.DelMessage.SerializeToString,
+            raft__pb2.DelReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -239,9 +239,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/VoteRequest',
-            mykvserver__pb2.VoteMessage.SerializeToString,
-            mykvserver__pb2.VoteReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/VoteRequest',
+            raft__pb2.VoteMessage.SerializeToString,
+            raft__pb2.VoteReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -256,9 +256,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/HeartBeat',
-            mykvserver__pb2.HBMessage.SerializeToString,
-            mykvserver__pb2.HBReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/HeartBeat',
+            raft__pb2.HBMessage.SerializeToString,
+            raft__pb2.HBReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -273,9 +273,9 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/SpreadLog',
-            mykvserver__pb2.LogMessage.SerializeToString,
-            mykvserver__pb2.LogReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/SpreadLog',
+            raft__pb2.LogMessage.SerializeToString,
+            raft__pb2.LogReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -290,8 +290,8 @@ class KVServer(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/KVServer/SpreadCommit',
-            mykvserver__pb2.CommitMessage.SerializeToString,
-            mykvserver__pb2.CommitReply.FromString,
+        return grpc.experimental.unary_unary(request, target, '/Raft/SpreadCommit',
+            raft__pb2.CommitMessage.SerializeToString,
+            raft__pb2.CommitReply.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
