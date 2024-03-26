@@ -22,14 +22,14 @@ message PutMessage{
 }
 
 message PutReply{
-	 string code = 1;
+	string code = 1;
 	message Payload{
 		 string act = 1;
 		 string key = 2;
 		 string value = 3;
 		 string message = 4;
 	}
-	 Payload payload = 2;
+	Payload payload = 2;
 
 }
 
