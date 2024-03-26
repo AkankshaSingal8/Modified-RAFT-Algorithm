@@ -6,6 +6,7 @@ import raft_pb2
 import raft_pb2_grpc
 import random
 import requests
+import sys
 
 FOLLOWER = 0
 CANDIDATE = 1
