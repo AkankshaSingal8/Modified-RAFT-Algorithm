@@ -7,16 +7,13 @@ import raft_pb2
 import raft_pb2_grpc
 import time
 
-_ONE_DAY_IN_SECONDS = 60 * 60 * 24
-my_ip = None
-my_host = None
-my_port = None
 n = None
 
 class Raft(raft_pb2_grpc.RaftServicer):
     def Join(self, request, context):
         response = raft_pb2.JoinResponse(ok=True)
         return response
+
     def PutRequest(self, request, context):
         #type = request.type
         #print('putting, request = ',request)
@@ -31,7 +28,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
             result = n.handle_put(payload)
             if result:
                 response.code='success'
-        elif n.status== FOLLOWER:
+        elif n.status == FOLLOWER:
             print('redirect to leader ',n.leader)
             response.payload.message = n.leader
             response.payload.act = payload['act']
@@ -42,7 +39,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         return response
 
     def GetRequest(self, request, context):
-        #print('getting, request = ',request)
+        # print('getting, request = ',request)
         payload = {'act': None, 'key': None,'value':None}
         payload['act'] = request.payload.act
         payload['key'] = request.payload.key
@@ -68,30 +65,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
         return response
 
-    def DelRequest(self, request, context):
-        #print('del, request = ', request)
-        payload = {'act': None, 'key': None, 'value': None}
-        payload['act'] = request.payload.act
-        payload['key'] = request.payload.key
-        payload['value'] = 'None'
-        response = raft_pb2.DelReply()
-        response.code = 'fail'
-        if n.status == LEADER:
-            #print('del, request = ', request)
-            result = n.handle_put(payload)
-            if result:
-                response.code = 'success'
-        elif n.status == FOLLOWER:
-            print('redirect to leader ', n.leader)
-            response.payload.message = n.leader
-            response.payload.act = payload['act']
-            response.payload.key = payload['key']
-            response.payload.value = payload['value']
-
-        #print('put response:', response)
-        return response
-
-    def VoteRequest(self, request, context):
+    def RequestVote(self, request, context):
         term = request.term
         commitIdx = request.commitIdx
         staged = {'act': None, 'key': None, 'value': None}
@@ -104,7 +78,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         message = raft_pb2.VoteReply(choice=choice,term=term)
         return message
 
-    def HeartBeat(self, request, context):
+    def AppendEntries(self, request, context):
         #print('Procedure heart beat')
         msg = {
             'term':request.term,
@@ -121,27 +95,29 @@ class Raft(raft_pb2_grpc.RaftServicer):
         if request.commitIdx:
             msg['commitIdx'] = request.commitIdx
         term,commitIdx = n.heartbeat_follower(msg)
-        reply = raft_pb2.HBReply()
+        reply = raft_pb2.AEReply()
         reply.term = term
         reply.commitIdx = commitIdx
         return reply
+
     def SpreadLog(self, request, context):
         pass
+
     def SpreadCommit(self, request, context):
         pass
 
 
-def GRPCserver(ip_list,my_ip):
+def GRPCserver(ip_list, my_ip):
     global n
     n = Node(ip_list, my_ip)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    raft_pb2_grpc.add_RaftServicer_to_server(Raft(),server)
+    raft_pb2_grpc.add_RaftServicer_to_server(Raft(), server)
     server.add_insecure_port(my_ip)
     time.sleep(5)
     server.start()
     try:
         while True:
-            time.sleep(_ONE_DAY_IN_SECONDS)
+            time.sleep(60 * 60 * 24)
     except KeyboardInterrupt:
         server.stop(0)
 
@@ -155,4 +131,4 @@ if __name__ == "__main__":
                 ip_list.append(ip.strip())
         my_ip = ip_list.pop(index)
         print(' * this is server Number',index)
-        GRPCserver(ip_list,my_ip)
+        GRPCserver(ip_list, my_ip)

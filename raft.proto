@@ -4,11 +4,11 @@ service Raft {
 	rpc Join(JoinRequest) returns (JoinResponse) {}
 	rpc PutRequest(PutMessage) returns (PutReply) {}
 	rpc GetRequest(GetMessage) returns (GetReply) {}
-	rpc DelRequest(DelMessage) returns (DelReply) {}
-	rpc VoteRequest(VoteMessage) returns (VoteReply) {}
-	rpc HeartBeat(HBMessage) returns (HBReply) {}
+	rpc RequestVote(VoteMessage) returns (VoteReply) {}
+	rpc AppendEntries(AEMessage) returns (AEReply) {}
 	rpc SpreadLog(LogMessage) returns (LogReply) {}
 	rpc SpreadCommit(CommitMessage) returns (CommitReply) {}
+	rpc ServeClient (ServeClientArgs) returns (ServeClientReply) {}
 }
 
 message PutMessage{
@@ -20,6 +20,7 @@ message PutMessage{
 	}
 	 Payload payload = 2;
 }
+
 message PutReply{
 	 string code = 1;
 	message Payload{
@@ -31,6 +32,7 @@ message PutReply{
 	 Payload payload = 2;
 
 }
+
 message GetMessage{
 	 string type = 1;
 	message Payload{
@@ -41,6 +43,7 @@ message GetMessage{
 	 Payload payload = 2;
 
 }
+
 message GetReply{
 	 string code = 1;
 	message Payload{
@@ -51,25 +54,7 @@ message GetReply{
 	}
 	 Payload payload = 2;
 }
-message DelMessage{
-	 string type = 1;
-	message Payload{
-		 string act = 1;
-		 string key = 2;
-		 string value = 3;
-	}
-	 Payload payload = 2;
-}
-message DelReply{
-	 string code = 1;
-	message Payload{
-		 string act = 1;
-		 string key = 2;
-		 string value = 3;
-		 string message = 4;
-	}
-	 Payload payload = 2;
-}
+
 message VoteMessage{
 	int32 term = 1;
  	int32 commitIdx = 2;
@@ -80,11 +65,13 @@ message VoteMessage{
 	}
 	 Staged staged = 3;
 }
+
 message VoteReply{
 	 bool choice = 1;
 	 int32 term = 2;
 }
-message HBMessage{
+
+message AEMessage{
 	 int32 term = 1;
 	 string addr = 2;
 	message Payload{
@@ -96,10 +83,12 @@ message HBMessage{
 	 string action = 4;
 	 int32 commitIdx = 5;
 }
-message HBReply{
+
+message AEReply{
 	 int32 term = 1;
 	 int32 commitIdx = 2;
 }
+
 message LogMessage{
 	 int32 term = 1;
 	 string addr = 2;
@@ -113,10 +102,12 @@ message LogMessage{
 	 int32 commitIdx = 5;
 
 }
+
 message LogReply{
 	 int32 term = 1;
 	 int32 commitIdx = 2;
 }
+
 message CommitMessage{
 	 int32 term = 1;
 	 string addr = 2;
@@ -128,6 +119,7 @@ message CommitMessage{
 	 Payload staged = 3;
 	 string action = 4;
 }
+
 message CommitReply{
 	 int32 term = 1;
 	 int32 commitIdx = 2;
@@ -138,4 +130,14 @@ message JoinRequest {
 
 message JoinResponse {
   bool ok = 1;
+}
+
+message ServeClientArgs {
+  string Request = 1;
+}
+
+message ServeClientReply {
+  string Data = 1;
+  string LeaderID = 2;
+  bool Success = 3;
 }

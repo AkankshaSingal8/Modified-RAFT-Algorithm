@@ -15,7 +15,6 @@ HIGH_TIMEOUT = 300
 REQUESTS_TIMEOUT = 50
 HB_TIME = 50
 MAX_LOG_WAIT = 50
-downVoters = set()
 
 def random_timeout():
     return random.randrange(LOW_TIMEOUT, HIGH_TIMEOUT) / 1000
@@ -28,9 +27,7 @@ def send(addr, route, message):
             json=message,
             timeout=REQUESTS_TIMEOUT / 1000,
         )
-    # failed to send request
     except Exception as e:
-        # print(e)
         return None
 
     if reply.status_code == 200:
@@ -38,8 +35,8 @@ def send(addr, route, message):
     else:
         return None
 
-def debugger(context,logid=1):
-    f = open('log2.txt','w')
+def debugger(context, logid=1):
+    f = open('log.txt','w')
     f.write(context)
     f.close()
 
@@ -202,7 +199,7 @@ class Node():
 
         while self.status == CANDIDATE and self.term == term and (voter not in self.vote_requests_sent):
             try:
-                reply = stub.VoteRequest(message)
+                reply = stub.RequestVote(message)
                 self.vote_requests_sent.add(voter)
                 if reply:
                     # choice = reply.json()["choice"]
@@ -259,7 +256,7 @@ class Node():
     def update_follower_commitIdx(self, follower):
         channel = grpc.insecure_channel(follower)
         stub = raft_pb2_grpc.RaftStub(channel)
-        message = raft_pb2.HBMessage()
+        message = raft_pb2.AEMessage()
         message.term = self.term
         message.addr = self.addr
         message.action = 'commit'
@@ -268,7 +265,7 @@ class Node():
         message.commitIdx = self.commitIdx
         if self.log[-1]['value']:
             message.payload.value = self.log[-1]['value']
-        reply = stub.HeartBeat(message)
+        reply = stub.AppendEntries(message)
 
     def send_heartbeat(self, follower):
         # check if the new follower have same commit index, else we tell them to update to our log level
@@ -287,13 +284,12 @@ class Node():
                 try:
                     if follower not in self.fellow:
                         self.fellow.append(follower)
-                    message = raft_pb2.HBMessage()
+                    message = raft_pb2.AEMessage()
                     message.term = self.term
                     message.addr = self.addr
-                    reply = stub.HeartBeat(message)
+                    reply = stub.AppendEntries(message)
                     if reply:
-                        self.heartbeat_reply_handler(reply.term,
-                                                    reply.commitIdx)
+                        self.heartbeat_reply_handler(reply.term, reply.commitIdx)
                     delta = time.time() - start
                     # keep the heartbeat constant even if the network speed is varying
                     time.sleep((HB_TIME - delta) / 1000)
@@ -406,7 +402,7 @@ class Node():
 
             channel = grpc.insecure_channel(each)
             stub = raft_pb2_grpc.RaftStub(channel)
-            m = raft_pb2.HBMessage()
+            m = raft_pb2.AEMessage()
             m.term = message['term']
             m.addr = message['addr']
             if message['payload'] is not None:
@@ -418,7 +414,7 @@ class Node():
             if message['action']:
                 m.action = message['action']
             m.commitIdx = self.commitIdx
-            r = stub.HeartBeat(m)
+            r = stub.AppendEntries(m)
             if r and confirmations:
                 # print(f" - - {message['action']} by {each}")
                 confirmations[i] = True
@@ -478,17 +474,10 @@ class Node():
         #    self.DB[key]= None
         #    key = None
         #    can_delete = False
-        if act == 'put':
+        if act == 'get':
             #print('it\'s a put transaction')
             value = self.staged["value"]
             self.DB[key] = value
-            cache_update = True
-        elif act =='del':
-            #print('it\' s a delete transaction')
-            if self.DB[key]:
-                self.DB[key] = None
-            else:
-                can_delete = False
             cache_update = True
         if cache_update:
             self.cache.set(key, value)
