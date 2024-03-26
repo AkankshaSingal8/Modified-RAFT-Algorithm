@@ -163,10 +163,27 @@ class Node():
     def incrementVote(self, term):
         self.voteCount += 1
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
-            print(f"{self.addr} becomes the leader of term {self.term}")
-            write_to_log(f'NO-OP {self.term}\n', self.log_dir)
-            self.status = LEADER
-            self.startHeartBeat()
+            log_entry = f'NO-OP {self.term}\n'
+            if not self.log_contains_entry(log_entry):
+                print(f"{self.addr} becomes the leader of term {self.term}")
+                write_to_log(log_entry, self.log_dir)
+                for node in self.fellow:
+                    log_dir = f'./logs_node_{node[-1]}'
+                    if os.path.exists(log_dir):
+                        write_to_log(log_entry, log_dir)
+                self.status = LEADER
+                self.startHeartBeat()
+
+    def log_contains_entry(self, entry):
+        log_file_path = os.path.join(self.log_dir, 'logs.txt')
+        if not os.path.exists(log_file_path):
+            return False
+        
+        with open(log_file_path, 'r') as f:
+            for line in f:
+                if line.strip() == entry.strip():
+                    return True
+        return False
 
     # vote for myself, increase term, change status to candidate
     # reset the timeout and start sending request to followers
@@ -175,6 +192,7 @@ class Node():
         self.voteCount = 0
         self.status = CANDIDATE
         self.init_timeout()
+        write_to_metadata(f'votedFor - {self.term} {self.addr[-1]}\n', self.log_dir)
         self.incrementVote(self.term)
         self.vote_requests_sent = set()
         self.send_vote_req()
@@ -217,6 +235,8 @@ class Node():
                     choice = reply.choice
                     # print(f"RECEIVED VOTE {choice} from {voter} in term {term}")
                     if choice and self.status == CANDIDATE:
+                        log_dir = f'./logs_node_{voter[-1]}'
+                        write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', log_dir)
                         self.incrementVote(term)
                     elif not choice:
                         # they declined because either I'm out-of-date or not newest term
@@ -429,7 +449,8 @@ class Node():
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
                     log_dir = f'./logs_node_{each[-1]}'
-                    write_to_log(f"SET {m.payload.key} {m.payload.key} {self.term}\n", log_dir)
+                    write_to_log(f"SET {m.payload.key} {m.payload.value} {self.term}\n", log_dir)
+                    write_to_metadata(f'log[] - {self.term} SET {m.payload.key} {m.payload.value}\n', log_dir)
             except:
                 continue
         if lock:
@@ -474,6 +495,7 @@ class Node():
                          args=(commit_message, None, self.lock)).start()
         print("majority reached, replied to client, sending message to commit, message:", commit_message)
         write_to_log(f"SET {payload['key']} {payload['value']} {self.term}\n", self.log_dir)
+        write_to_metadata(f"log[] - {self.term} SET {payload['key']} {payload['value']}\n", self.log_dir)
         return can_delete
 
     # put staged key-value pair into local database
