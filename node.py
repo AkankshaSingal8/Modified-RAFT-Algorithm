@@ -485,7 +485,7 @@ class Node():
         #    self.DB[key]= None
         #    key = None
         #    can_delete = False
-        if act == 'get':
+        if act == 'set':
             #print('it\'s a put transaction')
             value = self.staged["value"]
             self.DB[key] = value
