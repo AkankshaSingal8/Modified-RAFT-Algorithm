@@ -468,7 +468,7 @@ class Node():
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
         print("majority reached, replied to client, sending message to commit, message:", commit_message)
-        write_to_log(f'SET {payload.key} {payload.value} {self.term}', self.log_dir)
+        write_to_log(f'SET {payload} {self.term}', self.log_dir)
         return can_delete
 
     # put staged key-value pair into local database
