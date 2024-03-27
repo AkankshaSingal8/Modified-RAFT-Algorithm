@@ -126,7 +126,7 @@ class LRUCache:
                 tmp = tmp.next
             tmp_p = pair.format(None,None)
             res += tmp_p
-            print('current cache is ',res)
+            print('current cache is ', res)
 
     def get(self,key):
         if key in self.mapping:
@@ -139,24 +139,32 @@ class LRUCache:
 
 
 class Node():
-    def __init__(self, fellow, my_ip):
+    def __init__(self, fellow, my_ip, term=0, log_list=[]):
         self.addr = my_ip
         self.fellow = fellow
         self.lock = threading.Lock()
         self.DB = {}
         self.log = []
         self.staged = None
-        self.term = 0
+        self.term = int(term)
         self.status = FOLLOWER
         self.majority = len(self.fellow) // 2 + 1
         self.voteCount = 0
         self.commitIdx = 0
         self.timeout_thread = None
         self.init_timeout()
-        self.capacity = 3
+        self.capacity = 10
         self.cache = LRUCache(capacity=self.capacity)
         self.vote_requests_sent = set()
         self.log_dir = f'./logs_node_{self.addr[-1]}'
+        self.load_from_log(log_list)
+
+    def load_from_log(self, log_list):
+        for i in log_list:
+            key = i.split()[-2]
+            value = i.split()[-1]
+            self.cache.set(key, value)
+        self.cache.getallkeys()
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
@@ -247,11 +255,11 @@ class Node():
                         # update my term and terminate the vote_req
                         #term = reply.json()["term"]
                         term = int(reply.term)
-                        self.term = term
-                        self.status = FOLLOWER
-                        # if term > self.term:
-                        #     self.term = term
-                        #     self.status = FOLLOWER
+                        # self.term = term
+                        # self.status = FOLLOWER
+                        if term > self.term:
+                            self.term = term
+                            self.status = FOLLOWER
                         # fix out-of-date needed
                     break
             except:
@@ -313,15 +321,11 @@ class Node():
         try: 
             if self.log:
                 self.update_follower_commitIdx(follower)
-
-
             while self.status == LEADER:
                 try:
-
                     start = time.time()
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
-
                     ping = raft_pb2.JoinRequest()
                     #print(ping)
                     if ping:
@@ -465,9 +469,9 @@ class Node():
                 if r and confirmations:
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
-                    log_dir = f'./logs_node_{each[-1]}'
-                    write_to_log(f"SET {m.payload.key} {m.payload.value} {self.term}\n", log_dir)
-                    write_to_metadata(f'log[] - {self.term} SET {m.payload.key} {m.payload.value}\n', log_dir)
+                    # log_dir = f'./logs_node_{each[-1]}'
+                    # write_to_log(f"SET {m.payload.key} {m.payload.value} {self.term}\n", log_dir)
+                    # write_to_metadata(f'log[] - {self.term} SET {m.payload.key} {m.payload.value}\n', log_dir)
             except:
                 continue
         if lock:
@@ -540,4 +544,7 @@ class Node():
 
         # empty the staged so we can vote accordingly if there is a tie
         self.staged = None
+        log_dir = f'./logs_node_{self.addr[-1]}'
+        write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
+        write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
         return can_delete

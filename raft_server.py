@@ -108,9 +108,9 @@ class Raft(raft_pb2_grpc.RaftServicer):
         pass
 
 
-def GRPCserver(ip_list, my_ip):
+def GRPCserver(ip_list, my_ip, term, log_lines):
     global n
-    n = Node(ip_list, my_ip)
+    n = Node(ip_list, my_ip, term, log_lines)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_RaftServicer_to_server(Raft(), server)
     server.add_insecure_port(my_ip)
@@ -126,6 +126,8 @@ def GRPCserver(ip_list, my_ip):
 if __name__ == "__main__":
     if len(sys.argv) == 2:
         index = int(sys.argv[1])
+        term = 0
+        log_lines = []
         ip_list = []
         with open("ip_list.txt") as f:
             for ip in f:
@@ -135,4 +137,12 @@ if __name__ == "__main__":
         log_directory = f'./logs_node_{index}'
         if not os.path.exists(log_directory):
             os.makedirs(log_directory)
-        GRPCserver(ip_list, my_ip)
+        else:
+            with open(os.path.join(log_directory, 'metadata.txt'), 'r') as f:
+                for line in f:
+                    if "votedFor" in line:
+                        votedFor_line = line.strip()
+                    if "log[]" in line:
+                        log_lines.append(line.strip())
+            term = votedFor_line.split()[2]
+        GRPCserver(ip_list, my_ip, term, log_lines)
