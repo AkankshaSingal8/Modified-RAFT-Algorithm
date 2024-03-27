@@ -139,7 +139,7 @@ class LRUCache:
 
 
 class Node():
-    def __init__(self, fellow, my_ip, term=0, log_list=[]):
+    def __init__(self, fellow, my_ip, term=0, log_list=[], uncommited_list=[]):
         self.addr = my_ip
         self.fellow = fellow
         self.lock = threading.Lock()
@@ -157,13 +157,23 @@ class Node():
         self.cache = LRUCache(capacity=self.capacity)
         self.vote_requests_sent = set()
         self.log_dir = f'./logs_node_{self.addr[-1]}'
-        self.load_from_log(log_list)
+        self.commitTill = [0]*5
+        self.uncommited_list = uncommited_list
+        self.load_from_log(log_list, uncommited_list)
 
-    def load_from_log(self, log_list):
+    def load_from_log(self, log_list, uncommited_list):
         for i in log_list:
             key = i.split()[-2]
             value = i.split()[-1]
             self.cache.set(key, value)
+        print(uncommited_list)
+        for i in range(len(uncommited_list) - 1):
+            key = uncommited_list[i].split()[-2]
+            value = uncommited_list[i].split()[-1]
+            self.cache.set(key, value)
+            log_dir = f'./logs_node_{self.addr[-1]}'
+            write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
+            write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
         self.cache.getallkeys()
 
     # increment only when we are candidate and receive positve vote
@@ -291,7 +301,6 @@ class Node():
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
-
         for each in self.fellow:
             try:
                 t = threading.Thread(target=self.send_heartbeat, args=(each, ))
@@ -469,10 +478,8 @@ class Node():
                 if r and confirmations:
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
-                    # log_dir = f'./logs_node_{each[-1]}'
-                    # write_to_log(f"SET {m.payload.key} {m.payload.value} {self.term}\n", log_dir)
-                    # write_to_metadata(f'log[] - {self.term} SET {m.payload.key} {m.payload.value}\n', log_dir)
             except:
+                write_to_dump(f"uncommitedEntry - {self.commitIdx} SET {m.payload.key} {m.payload.value}\n", log_dir=f'./logs_node_{each[-1]}')
                 continue
         if lock:
             lock.release()

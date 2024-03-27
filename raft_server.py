@@ -108,9 +108,9 @@ class Raft(raft_pb2_grpc.RaftServicer):
         pass
 
 
-def GRPCserver(ip_list, my_ip, term, log_lines):
+def GRPCserver(ip_list, my_ip, term, log_lines, uncommited_list):
     global n
-    n = Node(ip_list, my_ip, term, log_lines)
+    n = Node(ip_list, my_ip, term, log_lines, uncommited_list)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_RaftServicer_to_server(Raft(), server)
     server.add_insecure_port(my_ip)
@@ -129,6 +129,7 @@ if __name__ == "__main__":
         term = 0
         log_lines = []
         ip_list = []
+        uncommited_list = []
         with open("ip_list.txt") as f:
             for ip in f:
                 ip_list.append(ip.strip())
@@ -145,4 +146,8 @@ if __name__ == "__main__":
                     if "log[]" in line:
                         log_lines.append(line.strip())
             term = votedFor_line.split()[2]
-        GRPCserver(ip_list, my_ip, term, log_lines)
+            with open(os.path.join(log_directory, 'dump.txt'), 'r') as f:
+                for line in f:
+                    if line.strip() not in uncommited_list:
+                        uncommited_list.append(line.strip())
+        GRPCserver(ip_list, my_ip, term, log_lines, uncommited_list)
