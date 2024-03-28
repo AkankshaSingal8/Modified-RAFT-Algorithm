@@ -166,7 +166,6 @@ class Node():
             key = i.split()[-2]
             value = i.split()[-1]
             self.cache.set(key, value)
-        print(uncommited_list)
         for i in range(len(uncommited_list) - 1):
             key = uncommited_list[i].split()[-2]
             value = uncommited_list[i].split()[-1]
