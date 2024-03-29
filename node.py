@@ -21,6 +21,7 @@ MAX_LOG_WAIT = 50
 def random_timeout():
     return random.randrange(LOW_TIMEOUT, HIGH_TIMEOUT) / 1000
 
+
 def send(addr, route, message):
     url = addr + '/' + route
     try:
@@ -67,10 +68,10 @@ class Cache:
 
     def printcache(self):
         if self.mapping:
-            print('current cache is', end=' ')
+            print('Current Cache:', end=' ')
             for key, value in self.mapping.items():
                 print(f'<{key}, {value}>', end=', ')
-            print()
+            print('\n')
 
     def get(self, key):
         if key in self.mapping:
@@ -116,6 +117,8 @@ class Node():
             write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
             write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
         self.cache.printcache()
+        self.lease_duration = 5  # Duration of the lease in seconds
+        self.lease_expiry = None  # When the current leader's lease expires
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
@@ -124,7 +127,7 @@ class Node():
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
             log_entry = f'NO-OP {self.term}\n'
             if not self.log_contains_entry(log_entry):
-                print(f"{self.addr} becomes the leader of term {self.term}")
+                print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
                 write_to_log(log_entry, self.log_dir)
                 for node in self.fellow:
                     log_dir = f'./logs_node_{node[-1]}'
@@ -249,6 +252,7 @@ class Node():
             except:
                 continue
 
+
     def update_follower_commitIdx(self, follower):
         try:
             channel = grpc.insecure_channel(follower)
@@ -274,8 +278,10 @@ class Node():
             while self.status == LEADER:
                 try:
                     start = time.time()
+                    self.lease_expiry = time.time() + self.lease_duration 
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
+
                     ping = raft_pb2.JoinRequest()
                     #print(ping)
                     if ping:
@@ -285,6 +291,7 @@ class Node():
                             message = raft_pb2.AEMessage()
                             message.term = self.term
                             message.addr = self.addr
+                            message.lease_expiry = int(self.lease_expiry * 1000) 
                             reply = stub.AppendEntries(message)
                             if reply:
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
@@ -381,7 +388,7 @@ class Node():
                 time.sleep(delta)
 
     def handle_get(self, payload):
-        print('handle_getting ',payload)
+        print(f'Get: {payload}\n')
         key = payload["key"]
         act = payload["act"]
         if act == 'get':

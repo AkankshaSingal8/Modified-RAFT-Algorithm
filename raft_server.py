@@ -30,7 +30,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
             if result:
                 response.code='success'
         elif n.status == FOLLOWER:
-            print('redirect to leader ', n.leader)
+            print(f'Redirect to Leader {n.leader}\n')
             response.payload.message = n.leader
             response.payload.act = payload['act']
             response.payload.key = payload['key']
@@ -57,7 +57,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
                 response.payload.value = result['value']
 
         elif n.status == FOLLOWER:
-            print('redirect to leader ',n.leader)
+            print(f'Redirect to Leader {n.leader}\n')
             response.payload.message = n.leader
             response.payload.act = payload['act']
             response.payload.key = payload['key']
@@ -81,9 +81,11 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     def AppendEntries(self, request, context):
         #print('Procedure heart beat')
+        lease_expiry = request.lease_expiry / 1000.0
         msg = {
             'term':request.term,
             'addr':request.addr,
+            'lease_expiry': lease_expiry
         }
         if request.payload:
             msg['payload'] = {
@@ -134,7 +136,7 @@ if __name__ == "__main__":
             for ip in f:
                 ip_list.append(ip.strip())
         my_ip = ip_list.pop(index)
-        print(' * this is server Number', index)
+        print(f'Server Number {index} ON\n')
         log_directory = f'./logs_node_{index}'
         if not os.path.exists(log_directory):
             os.makedirs(log_directory)
