@@ -21,6 +21,7 @@ MAX_LOG_WAIT = 50
 def random_timeout():
     return random.randrange(LOW_TIMEOUT, HIGH_TIMEOUT) / 1000
 
+
 def send(addr, route, message):
     url = addr + '/' + route
     try:
@@ -157,6 +158,8 @@ class Node():
         self.cache = LRUCache(capacity=self.capacity)
         self.vote_requests_sent = set()
         self.log_dir = f'./logs_node_{self.addr[-1]}'
+        self.lease_duration = 5  # Duration of the lease in seconds
+        self.lease_expiry = None  # When the current leader's lease expires
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
@@ -290,6 +293,7 @@ class Node():
                 t.start()
             except:
                 continue
+        
 
     def update_follower_commitIdx(self, follower):
         try:
@@ -319,8 +323,10 @@ class Node():
                 try:
 
                     start = time.time()
+                    self.lease_expiry = time.time() + self.lease_duration 
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
+
 
                     ping = raft_pb2.JoinRequest()
                     #print(ping)
@@ -331,6 +337,7 @@ class Node():
                             message = raft_pb2.AEMessage()
                             message.term = self.term
                             message.addr = self.addr
+                            message.lease_expiry = int(self.lease_expiry * 1000) 
                             reply = stub.AppendEntries(message)
                             if reply:
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)

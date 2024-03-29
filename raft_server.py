@@ -81,9 +81,11 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     def AppendEntries(self, request, context):
         #print('Procedure heart beat')
+        lease_expiry = request.lease_expiry / 1000.0
         msg = {
             'term':request.term,
             'addr':request.addr,
+            'lease_expiry': lease_expiry
         }
         if request.payload:
             msg['payload'] = {
