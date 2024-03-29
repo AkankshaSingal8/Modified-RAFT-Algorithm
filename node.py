@@ -55,109 +55,68 @@ def terminate(id):
     sys.exit(0)
 
 
-class CacheNode:
-    key = None
-    value = None
-    pre = None
-    next = None
+class Cache:
+    def __init__(self):
+        self.mapping = {}
+        self.order = []
 
-    def __init__(self,key,value):
-        self.key = key
-        self.value = value
-
-class LRUCache:
-    mapping = {}
-    head = None
-    end = None
-
-    def __init__(self,capacity):
-        self.capacity = capacity
-
-    def set(self,key,value):
+    def set(self, key, value):
         if key in self.mapping:
-            oldNode = self.mapping[key]
-            if value is None:
-                self.mapping.pop(key)
-                self.remove(oldNode)
-                #self.getallkeys()
-                #print('erase key', key)
-            else:
-                oldNode.value = value
-                self.remove(oldNode)
-                self.sethead(oldNode)
-        else:
-            node = CacheNode(key,value)
-            if len(self.mapping) >= self.capacity:
-                self.mapping.pop(self.end.key)
-                self.remove(self.end)
-                self.sethead(node)
-            else:
-                self.sethead(node)
-            self.mapping[key] = node
+            self.order.remove(key)
+        self.mapping[key] = value
+        self.order.append(key)
 
-    def sethead(self,node):
-        node.next = self.head
-        node.pre = None
-        if self.head:
-            self.head.pre = node
-        self.head = node
-        if not self.end:
-            self.end = self.head
+    def printcache(self):
+        if self.mapping:
+            print('current cache is', end=' ')
+            for key, value in self.mapping.items():
+                print(f'<{key}, {value}>', end=', ')
+            print()
 
-    def remove(self,node):
-        if node.pre:
-            node.pre.next = node.next
-        else:
-            self.head = node.next
-        if node.next:
-            node.next.pre = node.pre
-        else:
-            self.end = node.pre
-
-    def getallkeys(self):
-        tmp = None
-        if self.head:
-            tmp = self.head
-            pair = "<{0},{1}>"
-            res = ""
-            while tmp:
-                tmp_p = pair.format(tmp.key,tmp.value)
-                res += tmp_p
-                res += "->"
-                tmp = tmp.next
-            tmp_p = pair.format(None,None)
-            res += tmp_p
-            print('current cache is ',res)
-
-    def get(self,key):
+    def get(self, key):
         if key in self.mapping:
-            node = self.mapping[key]
-            self.remove(node)
-            self.sethead(node)
-            return node.value
+            self.order.remove(key)
+            self.order.append(key)
+            return self.mapping[key]
         else:
             return None
 
 
 class Node():
-    def __init__(self, fellow, my_ip):
+    def __init__(self, fellow, my_ip, term=0, log_list=[], uncommited_list=[]):
         self.addr = my_ip
         self.fellow = fellow
         self.lock = threading.Lock()
         self.DB = {}
         self.log = []
         self.staged = None
-        self.term = 0
+        self.term = int(term)
         self.status = FOLLOWER
         self.majority = len(self.fellow) // 2 + 1
         self.voteCount = 0
         self.commitIdx = 0
         self.timeout_thread = None
         self.init_timeout()
-        self.capacity = 3
-        self.cache = LRUCache(capacity=self.capacity)
+        self.cache = Cache()
         self.vote_requests_sent = set()
         self.log_dir = f'./logs_node_{self.addr[-1]}'
+        self.commitTill = [0]*5
+        self.uncommited_list = uncommited_list
+        self.load_from_log(log_list, uncommited_list)
+
+    def load_from_log(self, log_list, uncommited_list):
+        for i in log_list:
+            key = i.split()[-2]
+            value = i.split()[-1]
+            self.cache.set(key, value)
+        for i in range(len(uncommited_list) - 1):
+            key = uncommited_list[i].split()[-2]
+            value = uncommited_list[i].split()[-1]
+            self.cache.set(key, value)
+            log_dir = f'./logs_node_{self.addr[-1]}'
+            write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
+            write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
+        self.cache.printcache()
         self.lease_duration = 5  # Duration of the lease in seconds
         self.lease_expiry = None  # When the current leader's lease expires
 
@@ -250,11 +209,11 @@ class Node():
                         # update my term and terminate the vote_req
                         #term = reply.json()["term"]
                         term = int(reply.term)
-                        self.term = term
-                        self.status = FOLLOWER
-                        # if term > self.term:
-                        #     self.term = term
-                        #     self.status = FOLLOWER
+                        # self.term = term
+                        # self.status = FOLLOWER
+                        if term > self.term:
+                            self.term = term
+                            self.status = FOLLOWER
                         # fix out-of-date needed
                     break
             except:
@@ -286,7 +245,6 @@ class Node():
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
-
         for each in self.fellow:
             try:
                 t = threading.Thread(target=self.send_heartbeat, args=(each, ))
@@ -317,16 +275,12 @@ class Node():
         try: 
             if self.log:
                 self.update_follower_commitIdx(follower)
-
-
             while self.status == LEADER:
                 try:
-
                     start = time.time()
                     self.lease_expiry = time.time() + self.lease_duration 
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
-
 
                     ping = raft_pb2.JoinRequest()
                     #print(ping)
@@ -472,10 +426,8 @@ class Node():
                 if r and confirmations:
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
-                    log_dir = f'./logs_node_{each[-1]}'
-                    write_to_log(f"SET {m.payload.key} {m.payload.value} {self.term}\n", log_dir)
-                    write_to_metadata(f'log[] - {self.term} SET {m.payload.key} {m.payload.value}\n', log_dir)
             except:
+                write_to_dump(f"uncommitedEntry - {self.commitIdx} SET {m.payload.key} {m.payload.value}\n", log_dir=f'./logs_node_{each[-1]}')
                 continue
         if lock:
             lock.release()
@@ -542,9 +494,12 @@ class Node():
             cache_update = True
         if cache_update:
             self.cache.set(key, value)
-            self.cache.getallkeys()
+            self.cache.printcache()
         # put newly inserted key-value pair into local cache
 
         # empty the staged so we can vote accordingly if there is a tie
         self.staged = None
+        log_dir = f'./logs_node_{self.addr[-1]}'
+        write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
+        write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
         return can_delete
