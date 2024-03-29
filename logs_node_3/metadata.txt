@@ -1,0 +1,22 @@
+votedFor - 1 3
+votedFor - 2 3
+votedFor - 3 3
+votedFor - 4 3
+votedFor - 23 3
+votedFor - 24 3
+votedFor - 25 3
+votedFor - 26 3
+votedFor - 27 3
+votedFor - 28 3
+votedFor - 29 3
+votedFor - 30 3
+votedFor - 31 3
+votedFor - 32 3
+votedFor - 34 3
+votedFor - 35 3
+votedFor - 37 3
+votedFor - 39 3
+votedFor - 40 4
+log[] - 40 SET 1 5
+log[] - 40 SET 2 6
+log[] - 40 SET 3 7

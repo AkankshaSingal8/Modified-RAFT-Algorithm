@@ -251,6 +251,7 @@ class Node():
                 t.start()
             except:
                 continue
+        
 
 
     def update_follower_commitIdx(self, follower):

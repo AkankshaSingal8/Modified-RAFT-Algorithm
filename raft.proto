@@ -82,6 +82,7 @@ message AEMessage{
 	 Payload payload = 3;
 	 string action = 4;
 	 int32 commitIdx = 5;
+	 int64 lease_expiry = 6;
 }
 
 message AEReply{
