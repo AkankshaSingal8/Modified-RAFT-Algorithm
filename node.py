@@ -272,6 +272,37 @@ class Node():
         except:
             return
 
+    def startHeartBeat(self):
+        #print("Starting HEARTBEAT")
+        if self.staged:
+            # we have something staged at the beginngin of our leadership
+            # we consider it as a new payload just received and spread it aorund
+            self.handle_put(self.staged)
+        for each in self.fellow:
+            try:
+                t = threading.Thread(target=self.send_heartbeat, args=(each, ))
+                t.start()
+            except:
+                continue
+        
+
+    def update_follower_commitIdx(self, follower):
+        try:
+            channel = grpc.insecure_channel(follower)
+            stub = raft_pb2_grpc.RaftStub(channel)
+            message = raft_pb2.AEMessage()
+            message.term = self.term
+            message.addr = self.addr
+            message.action = 'commit'
+            message.payload.act = self.log[-1]['act']
+            message.payload.key = self.log[-1]['key']
+            message.commitIdx = self.commitIdx
+            if self.log[-1]['value']:
+                message.payload.value = self.log[-1]['value']
+            reply = stub.AppendEntries(message)
+        except:
+            return
+
     def send_heartbeat(self, follower):
         # check if the new follower have same commit index, else we tell them to update to our log level
         try: 
@@ -290,6 +321,8 @@ class Node():
                         try:
                             if follower not in self.fellow:
                                 self.fellow.append(follower)
+                            if follower not in self.fellow:
+                                self.fellow.append(follower)
                             message = raft_pb2.AEMessage()
                             message.term = self.term
                             message.addr = self.addr
@@ -303,6 +336,11 @@ class Node():
                         except:
                             continue
                     else:
+                        for index in range(len(self.fellow)):
+                            if self.fellow[index] == follower:
+                                self.fellow.pop(index)
+                                print('Server {} lost connect'.format(follower))
+                                break
                         for index in range(len(self.fellow)):
                             if self.fellow[index] == follower:
                                 self.fellow.pop(index)

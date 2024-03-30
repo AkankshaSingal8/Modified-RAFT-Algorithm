@@ -48,10 +48,10 @@ def send_request(action, key, val, ip_list):
                 response = stub.PutRequest(request)
             else:
                 invalid_input()
-            # print('response contents', response.code, response.payload.message, response.payload.act, response.payload.key, response.payload.value)
+            #print('response contents', response.code, response.payload.message, response.payload.act, response.payload.key, response.payload.value)
             # Check response code for success or need to redirect to leader
             if response.code == 'success':
-                print(f'Response Recieved: {response.code}')
+                print(f'Response Recieved: {response}')
                 break  # Success, exit loop
             elif response.code == 'fail' and response.payload:  # Assuming response includes leader info on failure
                 try:
