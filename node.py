@@ -68,10 +68,10 @@ class Cache:
 
     def printcache(self):
         if self.mapping:
-            print('current cache is', end=' ')
+            print('Current Cache:', end=' ')
             for key, value in self.mapping.items():
                 print(f'<{key}, {value}>', end=', ')
-            print()
+            print('\n')
 
     def get(self, key):
         if key in self.mapping:
@@ -144,7 +144,7 @@ class Node():
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
             log_entry = f'NO-OP {self.term}\n'
             if not self.log_contains_entry(log_entry):
-                print(f"{self.addr} becomes the leader of term {self.term}")
+                print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
                 write_to_log(log_entry, self.log_dir)
                 for node in self.fellow:
                     log_dir = f'./logs_node_{node[-1]}'
@@ -269,6 +269,7 @@ class Node():
             except:
                 continue
         
+
 
     def update_follower_commitIdx(self, follower):
         try:
@@ -413,7 +414,7 @@ class Node():
                 time.sleep(delta)
 
     def handle_get(self, payload):
-        print('handle_getting ',payload)
+        print(f'Get: {payload}\n')
         key = payload["key"]
         act = payload["act"]
         if act == 'get':
