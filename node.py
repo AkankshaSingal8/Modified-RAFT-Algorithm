@@ -240,19 +240,6 @@ class Node():
     # ------------------------------
     # START PRESIDENT
 
-    def startHeartBeat(self):
-        #print("Starting HEARTBEAT")
-        if self.staged:
-            # we have something staged at the beginngin of our leadership
-            # we consider it as a new payload just received and spread it aorund
-            self.handle_put(self.staged)
-        for each in self.fellow:
-            try:
-                t = threading.Thread(target=self.send_heartbeat, args=(each, ))
-                t.start()
-            except:
-                continue
-        
 
 
     def update_follower_commitIdx(self, follower):
@@ -272,38 +259,71 @@ class Node():
         except:
             return
 
+    # def startHeartBeat(self):
+    #     #print("Starting HEARTBEAT")
+    #     if self.staged:
+    #         # we have something staged at the beginngin of our leadership
+    #         # we consider it as a new payload just received and spread it aorund
+    #         self.handle_put(self.staged)
+    #     confirmations = [False] * len(self.fellow)
+    #     for i, each in enumerate(self.fellow):
+    #         try:
+    #             t = threading.Thread(target=self.send_heartbeat, args=(each, confirmations, i))
+    #             t.start()
+    #         except:
+    #             continue
+    #     while sum(confirmations) + 1 < self.majority:
+    #         continue
+
     def startHeartBeat(self):
         #print("Starting HEARTBEAT")
         if self.staged:
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
-        for each in self.fellow:
-            try:
-                t = threading.Thread(target=self.send_heartbeat, args=(each, ))
-                t.start()
-            except:
-                continue
+        #confirmations = [False] * len(self.fellow)
+        
+        while self.status == LEADER:
+            start_time = time.time()
+            successful_communications = 0
+            self.lease_expiry = time.time() + self.lease_duration
+
+            # Iterate through all followers to send heartbeats.
+            for i, follower in enumerate(self.fellow):
+                try:
+                    # Establish gRPC channel and stub for communication
+                    channel = grpc.insecure_channel(follower)
+                    stub = raft_pb2_grpc.RaftStub(channel)
+                    message = raft_pb2.AEMessage(term=self.term, addr=self.addr, lease_expiry = self.lease_expiry)
+                    reply = stub.AppendEntries(message)
+
+                    if reply:
+                        self.heartbeat_reply_handler(reply.term, reply.commitIdx)
+                        successful_communications += 1
+
+                except Exception as e:
+                    continue
+
+            # Check if successfully communicated with a majority.
+            if successful_communications >= self.majority:
+                # Successfully renewed lease with majority, update lease expiry time.
+                self.lease_expiry = time.time() + self.lease_duration
+            else:
+                # Check if lease has expired due to insufficient successful heartbeats.
+                #if self.lease_expiry is None or time.time() > self.lease_expiry:
+                print("Lease expired, stepping down from leadership.")
+                self.status = FOLLOWER
+                #self.init_timeout()  # Re-initiate the election timeout
+                break  # Exit the loop as the node is no longer a leader.
+
+            # Sleep for the remainder of the heartbeat interval before sending the next heartbeat.
+            elapsed_time = time.time() - start_time
+            sleep_duration = max(0, self.HB_TIME / 1000 - elapsed_time)
+            time.sleep(sleep_duration)
+
         
 
-    def update_follower_commitIdx(self, follower):
-        try:
-            channel = grpc.insecure_channel(follower)
-            stub = raft_pb2_grpc.RaftStub(channel)
-            message = raft_pb2.AEMessage()
-            message.term = self.term
-            message.addr = self.addr
-            message.action = 'commit'
-            message.payload.act = self.log[-1]['act']
-            message.payload.key = self.log[-1]['key']
-            message.commitIdx = self.commitIdx
-            if self.log[-1]['value']:
-                message.payload.value = self.log[-1]['value']
-            reply = stub.AppendEntries(message)
-        except:
-            return
-
-    def send_heartbeat(self, follower):
+    def send_heartbeat(self, follower, confirmations = None, i = 0):
         # check if the new follower have same commit index, else we tell them to update to our log level
         try: 
             if self.log:
@@ -312,9 +332,6 @@ class Node():
                 
                 try:
                     start = time.time()
-                    successful_communications = 0
-
-                    
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
                     
@@ -331,7 +348,7 @@ class Node():
                             reply = stub.AppendEntries(message)
                             if reply:
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
-                                successful_communications += 1
+                                
 
 
                             delta = time.time() - start
@@ -346,6 +363,8 @@ class Node():
                                 self.fellow.pop(index)
                                 print('Server {} lost connect'.format(follower))
                                 break
+
+                        
                 except:
                     continue
         except:
@@ -492,7 +511,7 @@ class Node():
         threading.Thread(target=self.spread_update,
                          args=(log_message, log_confirmations)).start()
         while sum(log_confirmations) + 1 < self.majority:
-            waited += 0.0005
+            waited += 0.0010
             time.sleep(0.0005)
             if waited > MAX_LOG_WAIT / 1000:
                 print(f"waited {MAX_LOG_WAIT} ms, update rejected:")
