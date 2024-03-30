@@ -16,7 +16,7 @@ LOW_TIMEOUT = 150
 HIGH_TIMEOUT = 300
 REQUESTS_TIMEOUT = 50
 HB_TIME = 50
-MAX_LOG_WAIT = 50
+MAX_LOG_WAIT = 100
 
 def random_timeout():
     return random.randrange(LOW_TIMEOUT, HIGH_TIMEOUT) / 1000
@@ -103,8 +103,8 @@ class Node():
         self.commitTill = [0]*5
         self.uncommited_list = uncommited_list
         self.load_from_log(log_list, uncommited_list)
-        self.lease_duration = 10  # Duration of the lease in seconds
-        self.lease_expiry = None  # When the current leader's lease expires
+        self.lease_duration = 2000
+        self.lease_expiry = None
 
     def load_from_log(self, log_list, uncommited_list):
         for i in log_list:
@@ -119,7 +119,7 @@ class Node():
             write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
             write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
         self.cache.printcache()
-        
+
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
@@ -329,26 +329,27 @@ class Node():
             if self.log:
                 self.update_follower_commitIdx(follower)
             while self.status == LEADER:
-                
                 try:
                     start = time.time()
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
-                    
+
                     ping = raft_pb2.JoinRequest()
                     #print(ping)
                     if ping:
                         try:
                             if follower not in self.fellow:
                                 self.fellow.append(follower)
+                            if follower not in self.fellow:
+                                self.fellow.append(follower)
                             message = raft_pb2.AEMessage()
                             message.term = self.term
                             message.addr = self.addr
-                            
+                            message.lease_expiry = int(self.lease_expiry * 1000) 
                             reply = stub.AppendEntries(message)
                             if reply:
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
-                                
+                                successful_communications += 1
 
 
                             delta = time.time() - start
@@ -356,20 +357,21 @@ class Node():
                             time.sleep((HB_TIME - delta) / 1000)
                         except:
                             continue
-
                     else:
                         for index in range(len(self.fellow)):
                             if self.fellow[index] == follower:
                                 self.fellow.pop(index)
                                 print('Server {} lost connect'.format(follower))
                                 break
-
-                        
+                        for index in range(len(self.fellow)):
+                            if self.fellow[index] == follower:
+                                self.fellow.pop(index)
+                                print('Server {} lost connect'.format(follower))
+                                break
                 except:
                     continue
         except:
-            return
-    
+            return    
 
     # we may step down when get replied
     def heartbeat_reply_handler(self, term, commitIdx):

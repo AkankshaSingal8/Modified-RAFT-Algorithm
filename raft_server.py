@@ -135,23 +135,30 @@ if __name__ == "__main__":
         with open("ip_list.txt") as f:
             for ip in f:
                 ip_list.append(ip.strip())
+
+        list_dir = []
+        for idx in range(len(ip_list)):
+            list_dir.append(f'./logs_node_{idx}')
+        for directory in list_dir:
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
         my_ip = ip_list.pop(index)
         print(f'Server Number {index} ON\n')
+
         log_directory = f'./logs_node_{index}'
-        if not os.path.exists(log_directory):
-            os.makedirs(log_directory)
-        else:
-            if os.path.exists(os.path.join(log_directory, 'metadata.txt')):
-                with open(os.path.join(log_directory, 'metadata.txt'), 'r') as f:
-                    for line in f:
-                        if "votedFor" in line:
-                            votedFor_line = line.strip()
-                        if "log[]" in line:
-                            log_lines.append(line.strip())
-                term = votedFor_line.split()[2]
-            if os.path.exists(os.path.join(log_directory, 'dump.txt')):
-                with open(os.path.join(log_directory, 'dump.txt'), 'r') as f:
-                    for line in f:
-                        if line.strip() not in uncommited_list:
-                            uncommited_list.append(line.strip())
+        if os.path.exists(os.path.join(log_directory, 'metadata.txt')):
+            with open(os.path.join(log_directory, 'metadata.txt'), 'r') as f:
+                for line in f:
+                    if "votedFor" in line:
+                        votedFor_line = line.strip()
+                    if "log[]" in line:
+                        log_lines.append(line.strip())
+            term = votedFor_line.split()[2]
+        if os.path.exists(os.path.join(log_directory, 'dump.txt')):
+            with open(os.path.join(log_directory, 'dump.txt'), 'r') as f:
+                for line in f:
+                    if line.strip() not in uncommited_list:
+                        uncommited_list.append(line.strip())
+
         GRPCserver(ip_list, my_ip, term, log_lines, uncommited_list)
