@@ -299,9 +299,6 @@ class Node():
                             if reply:
                                 heartbeat_recieved[int(follower[-1])] = True
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
-                                successful_communications += 1
-
-
                             delta = time.time() - start
                             # keep the heartbeat constant even if the network speed is varying
                             time.sleep((HB_TIME - delta) / 1000)
