@@ -97,6 +97,16 @@ class Node():
             except:
                 continue
         return count
+    def log_contains_entry(self, entry):
+        log_file_path = os.path.join(self.log_dir, 'logs.txt')
+        if not os.path.exists(log_file_path):
+            return False
+        
+        with open(log_file_path, 'r') as f:
+            for line in f:
+                if line.strip() == entry.strip():
+                    return True
+        return False
 
     def load_from_log(self, log_list, uncommited_list):
         for i in log_list:
@@ -129,14 +139,16 @@ class Node():
     def incrementVote(self, term):
         self.voteCount += 1
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority and self.onServers() + 1 >= self.majority and self.acquire_lease():
-            print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
             log_entry = f'NO-OP {self.term}\n'
-            write_to_dump(f'Node {self.addr[-1]} became the leader for term {self.term}.\n', self.log_dir)
-            for node in self.fellow:
-                log_dir = f'./logs_node_{node[-1]}'
-                write_to_log(log_entry, log_dir)
-            self.status = LEADER
-            self.startHeartBeat()
+            if not self.log_contains_entry(log_entry):
+                print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
+                log_entry = f'NO-OP {self.term}\n'
+                write_to_dump(f'Node {self.addr[-1]} became the leader for term {self.term}.\n', self.log_dir)
+                for node in self.fellow:
+                    log_dir = f'./logs_node_{node[-1]}'
+                    write_to_log(log_entry, log_dir)
+                self.status = LEADER
+                self.startHeartBeat()
 
     # vote for myself, increase term, change status to candidate
     # reset the timeout and start sending request to followers
