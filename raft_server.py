@@ -148,7 +148,7 @@ if __name__ == "__main__":
         if os.path.exists(os.path.join(log_directory, 'dump.txt')):
             with open(os.path.join(log_directory, 'dump.txt'), 'r') as f:
                 for line in f:
-                    if line.strip() not in uncommited_list:
+                    if "uncommitedEntry" in line and line.strip() not in uncommited_list:
                         uncommited_list.append(line.strip())
 
         GRPCserver(ip_list, my_ip, term, log_lines, uncommited_list)
