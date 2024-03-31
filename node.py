@@ -119,6 +119,7 @@ class Node():
                 print(f'Acquired lease with duration {LEASE_TIME / 1000} s\n')
                 return True
             else:
+                write_to_dump(f'New Leader waiting for Old Leader Lease to timeout.\n', self.log_dir)
                 print('New Leader waiting for Old Leader Lease to timeout\n')
                 self.lease_expiry_list = [False] * len(self.fellow)
                 print('Old Leader Lease timeout\n')
@@ -130,27 +131,17 @@ class Node():
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority and self.onServers() + 1 >= self.majority and self.acquire_lease():
             print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
             log_entry = f'NO-OP {self.term}\n'
+            write_to_dump(f'Node {self.addr[-1]} became the leader for term {self.term}.\n', self.log_dir)
             for node in self.fellow:
                 log_dir = f'./logs_node_{node[-1]}'
-                if os.path.exists(log_dir):
-                    write_to_log(log_entry, log_dir)
+                write_to_log(log_entry, log_dir)
             self.status = LEADER
             self.startHeartBeat()
-
-    def log_contains_entry(self, entry):
-        log_file_path = os.path.join(self.log_dir, 'logs.txt')
-        if not os.path.exists(log_file_path):
-            return False
-        
-        with open(log_file_path, 'r') as f:
-            for line in f:
-                if line.strip() == entry.strip():
-                    return True
-        return False
 
     # vote for myself, increase term, change status to candidate
     # reset the timeout and start sending request to followers
     def startElection(self):
+        write_to_dump(f'Node {self.addr[-1]} election timer timed out, Starting election.\n', self.log_dir)
         self.term += 1
         self.voteCount = 0
         self.status = CANDIDATE
@@ -238,6 +229,7 @@ class Node():
 
     def startHeartBeat(self):
         #print("Starting HEARTBEAT")
+        write_to_dump(f'Leader {self.addr[-1]} sending heartbeat & Renewing Lease\n', self.log_dir)
         if self.staged:
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
@@ -277,7 +269,8 @@ class Node():
                     self.status = FOLLOWER
                     self.lease_expiry_list = [False] * len(self.fellow)
                     self.init_timeout()
-                    print(f'Lease expired. Stepping down.\n')
+                    write_to_dump(f'Leader {self.addr[-1]} lease renewal failed. Stepping Down.\n', self.log_dir)
+                    print(f'Lease expired. Stepping down\n')
                     return
                 try:
                     start = time.time()
