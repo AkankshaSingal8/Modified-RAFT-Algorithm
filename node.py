@@ -83,8 +83,8 @@ class Node():
         self.uncommited_list = uncommited_list
         self.load_from_log(log_list, uncommited_list)
         self.lease_expiry = 0
-        self.heartbeat_recieved = [False] * 5
-        self.lease_expiry_list = [False] * 5
+        self.heartbeat_recieved = [False] * len(self.fellow)
+        self.lease_expiry_list = [False] * len(self.fellow)
 
     def onServers(self):
         count = 0
@@ -114,23 +114,18 @@ class Node():
         # self.cache.printcache()
 
     def acquire_lease(self):
-        
         while True:
             if sum(self.lease_expiry_list) == 0:
-                print('index', int(self.addr[-1]))
-                self.lease_expiry_list = [False] * 5
+                self.lease_expiry_list = [False] * len(self.fellow)
                 self.lease_expiry = time.time() + LEASE_TIME / 1000
                 self.lease_expiry_list[int(self.addr[-1])] = True
                 print(f'Acquired lease with duration {LEASE_TIME / 1000} s\n')
-                print(self.lease_expiry_list)
                 break
             else:
-                print('New Leader waiting for Old Leader Lease to timeout\n', self.lease_expiry / 1000)
+                print('New Leader waiting for Old Leader Lease to timeout\n')
                 time.sleep((self.lease_expiry - time.time()) / 1000)
-                self.lease_expiry_list = [False] * 5
-                print("lease timeout")
-
-
+                self.lease_expiry_list = [False] * len(self.fellow)
+                print('Old Leader Lease timeout\n')
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
@@ -149,7 +144,6 @@ class Node():
                             write_to_log(log_entry, log_dir)
                     self.status = LEADER
                     self.acquire_lease()
-                    
                     self.startHeartBeat()
 
     def log_contains_entry(self, entry):
@@ -197,7 +191,6 @@ class Node():
         channel = grpc.insecure_channel(voter)
         stub = raft_pb2_grpc.RaftStub(channel)
         message = raft_pb2.VoteMessage()
-
         message.term = term
         message.commitIdx = self.commitIdx
         if self.staged:
@@ -258,7 +251,7 @@ class Node():
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
-        self.heartbeat_recieved = [False] * 5
+        self.heartbeat_recieved = [False] * len(self.fellow)
         self.heartbeat_recieved[int(self.addr[-1])] = True
         for each in self.fellow:
             try:
@@ -291,7 +284,7 @@ class Node():
             while self.status == LEADER:
                 if time.time() > self.lease_expiry:
                     self.status = FOLLOWER
-                    self.lease_expiry_list = [False] * 5
+                    self.lease_expiry_list = [False] * len(self.fellow)
                     self.init_timeout()
                     print(f'Lease expired. Stepping down.\n')
                     return
@@ -318,7 +311,6 @@ class Node():
                             if sum(heartbeat_recieved) >= self.majority:
                                 #print(sum(heartbeat_recieved))
                                 if self.lease_expiry_list[int(self.addr[-1])] == True:
-                                    #print("lease updated   ")
                                     self.lease_expiry = time.time() + LEASE_TIME / 1000
                         except:
                             heartbeat_recieved[int(follower[-1])] = False
