@@ -12,11 +12,10 @@ FOLLOWER = 0
 CANDIDATE = 1
 LEADER = 2
 addr = None
-LOW_TIMEOUT = 150
-HIGH_TIMEOUT = 300
-REQUESTS_TIMEOUT = 50
+LOW_TIMEOUT = 5000
+HIGH_TIMEOUT = 10000
 HB_TIME = 50
-MAX_LOG_WAIT = 100
+MAX_LOG_WAIT = 1000
 LEASE_TIME = 5000
 
 def random_timeout():
@@ -104,26 +103,23 @@ class Node():
             key = i.split()[-2]
             value = i.split()[-1]
             self.cache.set(key, value)
-        for i in range(len(uncommited_list) - 1):
+        for i in range(len(uncommited_list)):
             key = uncommited_list[i].split()[-2]
             value = uncommited_list[i].split()[-1]
             self.cache.set(key, value)
             log_dir = f'./logs_node_{self.addr[-1]}'
             write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
             write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
-        # self.cache.printcache()
 
     def acquire_lease(self):
         while True:
             if sum(self.lease_expiry_list) == 0:
-                self.lease_expiry_list = [False] * len(self.fellow)
                 self.lease_expiry = time.time() + LEASE_TIME / 1000
                 self.lease_expiry_list[int(self.addr[-1])] = True
                 print(f'Acquired lease with duration {LEASE_TIME / 1000} s\n')
-                break
+                return True
             else:
                 print('New Leader waiting for Old Leader Lease to timeout\n')
-                time.sleep((self.lease_expiry - time.time()) / 1000)
                 self.lease_expiry_list = [False] * len(self.fellow)
                 print('Old Leader Lease timeout\n')
 
@@ -131,20 +127,15 @@ class Node():
     # change status to LEADER and start heartbeat as soon as we reach majority
     def incrementVote(self, term):
         self.voteCount += 1
-        if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
-            on_servers = self.onServers()
-            if on_servers + 1 >= self.majority:
-                log_entry = f'NO-OP {self.term}\n'
-                if not self.log_contains_entry(log_entry):
-                    print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
-                    write_to_log(log_entry, self.log_dir)
-                    for node in self.fellow:
-                        log_dir = f'./logs_node_{node[-1]}'
-                        if os.path.exists(log_dir):
-                            write_to_log(log_entry, log_dir)
-                    self.status = LEADER
-                    self.acquire_lease()
-                    self.startHeartBeat()
+        if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority and self.onServers() + 1 >= self.majority and self.acquire_lease():
+            print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
+            log_entry = f'NO-OP {self.term}\n'
+            for node in self.fellow:
+                log_dir = f'./logs_node_{node[-1]}'
+                if os.path.exists(log_dir):
+                    write_to_log(log_entry, log_dir)
+            self.status = LEADER
+            self.startHeartBeat()
 
     def log_contains_entry(self, entry):
         log_file_path = os.path.join(self.log_dir, 'logs.txt')
@@ -344,11 +335,10 @@ class Node():
         # we will both step down
 
         term = msg["term"]
-        received_lease_expiry = msg['lease_expiry'] / 1000  # Convert back from milliseconds if needed
-        self.lease_expiry = max(self.lease_expiry, received_lease_expiry)
         if self.term <= term:
             self.leader = msg["addr"]
-            
+            received_lease_expiry = msg['lease_expiry']
+            self.lease_expiry = max(self.lease_expiry, received_lease_expiry)
             self.reset_timeout()
             # in case I am not follower
             # or started an election and lost it
