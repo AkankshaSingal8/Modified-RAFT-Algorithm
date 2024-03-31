@@ -16,7 +16,7 @@ LOW_TIMEOUT = 5000
 HIGH_TIMEOUT = 10000
 HB_TIME = 50
 MAX_LOG_WAIT = 1000
-LEASE_TIME = 5000
+LEASE_TIME = 10000
 
 def random_timeout():
     return random.randrange(LOW_TIMEOUT, HIGH_TIMEOUT) / 1000
