@@ -49,7 +49,10 @@ def send_request(action, key, val, ip_list):
             else:
                 invalid_input()
             if response.code == 'success':
-                print(f'Response Recieved: {response}')
+                if action.lower() == 'set':
+                    print(f'SET request: {response.code}\n')
+                elif action.lower() == 'get':
+                    print(f'Value for key {response.payload.key} is {response.payload.value}\n')
                 break
             elif response.code == 'fail' and response.payload:
                 try:
