@@ -103,7 +103,7 @@ class Node():
         self.commitTill = [0]*5
         self.uncommited_list = uncommited_list
         self.load_from_log(log_list, uncommited_list)
-        self.lease_duration = 2000
+        self.lease_duration = 5.0
         self.lease_expiry = None
 
     def load_from_log(self, log_list, uncommited_list):
@@ -259,21 +259,24 @@ class Node():
         except:
             return
 
-    # def startHeartBeat(self):
-    #     #print("Starting HEARTBEAT")
-    #     if self.staged:
-    #         # we have something staged at the beginngin of our leadership
-    #         # we consider it as a new payload just received and spread it aorund
-    #         self.handle_put(self.staged)
-    #     confirmations = [False] * len(self.fellow)
-    #     for i, each in enumerate(self.fellow):
-    #         try:
-    #             t = threading.Thread(target=self.send_heartbeat, args=(each, confirmations, i))
-    #             t.start()
-    #         except:
-    #             continue
-    #     while sum(confirmations) + 1 < self.majority:
-    #         continue
+
+    def spread_update(self, message, confirmations=None, lock=None):
+        for i, each in enumerate(self.fellow):
+            try:
+                channel = grpc.insecure_channel(each)
+                stub = raft_pb2_grpc.RaftStub(channel)
+                message = raft_pb2.AEMessage()
+                message.term = self.term
+                message.addr = self.addr
+
+                reply = stub.AppendEntries(message)
+                if reply:
+                    self.heartbeat_reply_handler(reply.term, reply.commitIdx)
+                    successful_communications += 1
+
+
+            except:
+                continue
 
     def startHeartBeat(self):
         #print("Starting HEARTBEAT")
@@ -281,47 +284,17 @@ class Node():
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
-        #confirmations = [False] * len(self.fellow)
-        
-        while self.status == LEADER:
-            start_time = time.time()
-            successful_communications = 0
-            self.lease_expiry = time.time() + self.lease_duration
+        confirmations = [False] * len(self.fellow)
+        threading.Thread(target=self.sendheartbeat(),
+                         args=(confirmations)).start()
+        while sum(confirmations) + 1 < self.majority:
+            waited += 0.0010
+            time.sleep(0.0005)
+            if waited > MAX_LOG_WAIT / 1000:
+                print(f"stepping down")
+                #self.status = FOLLOWER
+                return False
 
-            # Iterate through all followers to send heartbeats.
-            for i, follower in enumerate(self.fellow):
-                try:
-                    # Establish gRPC channel and stub for communication
-                    channel = grpc.insecure_channel(follower)
-                    stub = raft_pb2_grpc.RaftStub(channel)
-                    message = raft_pb2.AEMessage(term=self.term, addr=self.addr, lease_expiry = self.lease_expiry)
-                    reply = stub.AppendEntries(message)
-
-                    if reply:
-                        self.heartbeat_reply_handler(reply.term, reply.commitIdx)
-                        successful_communications += 1
-
-                except Exception as e:
-                    continue
-
-            # Check if successfully communicated with a majority.
-            if successful_communications >= self.majority:
-                # Successfully renewed lease with majority, update lease expiry time.
-                self.lease_expiry = time.time() + self.lease_duration
-            else:
-                # Check if lease has expired due to insufficient successful heartbeats.
-                #if self.lease_expiry is None or time.time() > self.lease_expiry:
-                print("Lease expired, stepping down from leadership.")
-                self.status = FOLLOWER
-                #self.init_timeout()  # Re-initiate the election timeout
-                break  # Exit the loop as the node is no longer a leader.
-
-            # Sleep for the remainder of the heartbeat interval before sending the next heartbeat.
-            elapsed_time = time.time() - start_time
-            sleep_duration = max(0, self.HB_TIME / 1000 - elapsed_time)
-            time.sleep(sleep_duration)
-
-        
 
     def send_heartbeat(self, follower, confirmations = None, i = 0):
         # check if the new follower have same commit index, else we tell them to update to our log level
