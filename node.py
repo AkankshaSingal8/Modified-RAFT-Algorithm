@@ -17,26 +17,10 @@ HIGH_TIMEOUT = 300
 REQUESTS_TIMEOUT = 50
 HB_TIME = 50
 MAX_LOG_WAIT = 100
+LEASE_TIME = 5000
 
 def random_timeout():
     return random.randrange(LOW_TIMEOUT, HIGH_TIMEOUT) / 1000
-
-
-def send(addr, route, message):
-    url = addr + '/' + route
-    try:
-        reply = requests.post(
-            url=url,
-            json=message,
-            timeout=REQUESTS_TIMEOUT / 1000,
-        )
-    except Exception as e:
-        return None
-
-    if reply.status_code == 200:
-        return reply
-    else:
-        return None
 
 def write_to_log(context, log_dir):
     with open(os.path.join(log_dir, 'logs.txt'), 'a+') as f:
@@ -49,10 +33,6 @@ def write_to_metadata(context, log_dir):
 def write_to_dump(context, log_dir):
     with open(os.path.join(log_dir, 'dump.txt'), 'a+') as f:
         f.write(context)
-
-def terminate(id):
-    print(f"Server {id} is shutting down...")
-    sys.exit(0)
 
 
 class Cache:
@@ -100,11 +80,23 @@ class Node():
         self.cache = Cache()
         self.vote_requests_sent = set()
         self.log_dir = f'./logs_node_{self.addr[-1]}'
-        self.commitTill = [0]*5
         self.uncommited_list = uncommited_list
         self.load_from_log(log_list, uncommited_list)
-        self.lease_duration = 2000
-        self.lease_expiry = None
+        self.lease_expiry = 0
+        self.heartbeat_recieved = [False] * 5
+
+    def onServers(self):
+        count = 0
+        for each in self.fellow:
+            channel = grpc.insecure_channel(each)
+            stub = raft_pb2_grpc.RaftStub(channel)
+            ping = raft_pb2.JoinRequest()
+            try:
+                response = stub.Join(ping)
+                count += 1
+            except:
+                continue
+        return count
 
     def load_from_log(self, log_list, uncommited_list):
         for i in log_list:
@@ -118,24 +110,35 @@ class Node():
             log_dir = f'./logs_node_{self.addr[-1]}'
             write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
             write_to_metadata(f'log[] - {self.term} SET {key} {value}\n', log_dir)
-        self.cache.printcache()
+        # self.cache.printcache()
 
+    def acquire_lease(self):
+        while True:
+            if time.time() > self.lease_expiry:
+                self.lease_expiry = time.time() + LEASE_TIME / 1000
+                print(f'Acquired lease with duration {LEASE_TIME / 1000} s\n')
+                break
+            else:
+                print('New Leader waiting for Old Leader Lease to timeout\n')
 
     # increment only when we are candidate and receive positve vote
     # change status to LEADER and start heartbeat as soon as we reach majority
     def incrementVote(self, term):
         self.voteCount += 1
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority:
-            log_entry = f'NO-OP {self.term}\n'
-            if not self.log_contains_entry(log_entry):
-                print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
-                write_to_log(log_entry, self.log_dir)
-                for node in self.fellow:
-                    log_dir = f'./logs_node_{node[-1]}'
-                    if os.path.exists(log_dir):
-                        write_to_log(log_entry, log_dir)
-                self.status = LEADER
-                self.startHeartBeat()
+            on_servers = self.onServers()
+            if on_servers + 1 >= self.majority:
+                log_entry = f'NO-OP {self.term}\n'
+                if not self.log_contains_entry(log_entry):
+                    print(f'Server {self.addr[-1]} becomes LEADER of term {self.term}\n')
+                    write_to_log(log_entry, self.log_dir)
+                    for node in self.fellow:
+                        log_dir = f'./logs_node_{node[-1]}'
+                        if os.path.exists(log_dir):
+                            write_to_log(log_entry, log_dir)
+                    self.status = LEADER
+                    self.acquire_lease()
+                    self.startHeartBeat()
 
     def log_contains_entry(self, entry):
         log_file_path = os.path.join(self.log_dir, 'logs.txt')
@@ -171,8 +174,7 @@ class Node():
         # or I am the leader
         for voter in self.fellow:
             try:
-                threading.Thread(target=self.ask_for_vote,
-                            args=(voter, self.term)).start()
+                threading.Thread(target=self.ask_for_vote, args=(voter, self.term)).start()
             except:
                 continue
 
@@ -180,11 +182,9 @@ class Node():
     # request vote to other servers during given election term
     def ask_for_vote(self, voter, term):
         # need to include self.commitIdx, only up-to-date candidate could win
-        #debugger (self.addr+'+'+voter)
         channel = grpc.insecure_channel(voter)
         stub = raft_pb2_grpc.RaftStub(channel)
         message = raft_pb2.VoteMessage()
-        #debugger (stub.VoteRequest(message),2)
 
         message.term = term
         message.commitIdx = self.commitIdx
@@ -246,14 +246,13 @@ class Node():
             # we have something staged at the beginngin of our leadership
             # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
+        self.heartbeat_recieved = [False] * 5
+        self.heartbeat_recieved[int(self.addr[-1])] = True
         for each in self.fellow:
             try:
-                t = threading.Thread(target=self.send_heartbeat, args=(each, ))
-                t.start()
+                threading.Thread(target=self.send_heartbeat, args=(each, self.heartbeat_recieved, )).start()
             except:
                 continue
-        
-
 
     def update_follower_commitIdx(self, follower):
         try:
@@ -270,77 +269,46 @@ class Node():
                 message.payload.value = self.log[-1]['value']
             reply = stub.AppendEntries(message)
         except:
-            return
+            return        
 
-    def startHeartBeat(self):
-        #print("Starting HEARTBEAT")
-        if self.staged:
-            # we have something staged at the beginngin of our leadership
-            # we consider it as a new payload just received and spread it aorund
-            self.handle_put(self.staged)
-        for each in self.fellow:
-            try:
-                t = threading.Thread(target=self.send_heartbeat, args=(each, ))
-                t.start()
-            except:
-                continue
-        
-
-    def update_follower_commitIdx(self, follower):
-        try:
-            channel = grpc.insecure_channel(follower)
-            stub = raft_pb2_grpc.RaftStub(channel)
-            message = raft_pb2.AEMessage()
-            message.term = self.term
-            message.addr = self.addr
-            message.action = 'commit'
-            message.payload.act = self.log[-1]['act']
-            message.payload.key = self.log[-1]['key']
-            message.commitIdx = self.commitIdx
-            if self.log[-1]['value']:
-                message.payload.value = self.log[-1]['value']
-            reply = stub.AppendEntries(message)
-        except:
-            return
-
-    def send_heartbeat(self, follower):
+    def send_heartbeat(self, follower, heartbeat_recieved):
         # check if the new follower have same commit index, else we tell them to update to our log level
-        try: 
+        try:
             if self.log:
                 self.update_follower_commitIdx(follower)
             while self.status == LEADER:
+                if time.time() > self.lease_expiry:
+                    self.status = FOLLOWER
+                    self.init_timeout()
+                    print(f'Lease expired. Stepping down.\n')
+                    return
                 try:
                     start = time.time()
-                    self.lease_expiry = start + self.lease_duration / 1000
                     channel = grpc.insecure_channel(follower)
                     stub = raft_pb2_grpc.RaftStub(channel)
-
                     ping = raft_pb2.JoinRequest()
-                    #print(ping)
                     if ping:
                         try:
-                            if follower not in self.fellow:
-                                self.fellow.append(follower)
                             if follower not in self.fellow:
                                 self.fellow.append(follower)
                             message = raft_pb2.AEMessage()
                             message.term = self.term
                             message.addr = self.addr
-                            message.lease_expiry = int(self.lease_expiry * 1000) 
+                            message.lease_expiry = int(self.lease_expiry)
                             reply = stub.AppendEntries(message)
                             if reply:
+                                heartbeat_recieved[int(follower[-1])] = True
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
                             delta = time.time() - start
                             # keep the heartbeat constant even if the network speed is varying
                             time.sleep((HB_TIME - delta) / 1000)
+                            if sum(heartbeat_recieved) >= self.majority:
+                                # print(sum(heartbeat_recieved))
+                                self.lease_expiry = time.time() + LEASE_TIME / 1000
                         except:
+                            heartbeat_recieved[int(follower[-1])] = False
                             continue
                     else:
-                        for index in range(len(self.fellow)):
-                            if self.fellow[index] == follower:
-                                self.fellow.pop(index)
-                                print('Server {} lost connect'.format(follower))
-                                break
                         for index in range(len(self.fellow)):
                             if self.fellow[index] == follower:
                                 self.fellow.pop(index)
@@ -349,7 +317,7 @@ class Node():
                 except:
                     continue
         except:
-            return    
+            return
 
     # we may step down when get replied
     def heartbeat_reply_handler(self, term, commitIdx):
@@ -360,15 +328,8 @@ class Node():
             self.status = FOLLOWER
             self.init_timeout()
 
-        # TODO logging replies
-
-    # ------------------------------
-    # FOLLOWER STUFF
-
     def reset_timeout(self):
         self.election_time = time.time() + random_timeout()
-
-    # /heartbeat
 
     def heartbeat_follower(self, msg):
         # weird case if 2 are PRESIDENT of same term.
@@ -376,8 +337,10 @@ class Node():
         # we will both step down
 
         term = msg["term"]
+        self.lease_expiry = msg['lease_expiry']
         if self.term <= term:
             self.leader = msg["addr"]
+            
             self.reset_timeout()
             # in case I am not follower
             # or started an election and lost it

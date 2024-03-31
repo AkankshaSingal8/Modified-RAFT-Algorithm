@@ -48,28 +48,23 @@ def send_request(action, key, val, ip_list):
                 response = stub.PutRequest(request)
             else:
                 invalid_input()
-            #print('response contents', response.code, response.payload.message, response.payload.act, response.payload.key, response.payload.value)
-            # Check response code for success or need to redirect to leader
             if response.code == 'success':
                 print(f'Response Recieved: {response}')
-                break  # Success, exit loop
-            elif response.code == 'fail' and response.payload:  # Assuming response includes leader info on failure
+                break
+            elif response.code == 'fail' and response.payload:
                 try:
                     leader_addr = response.payload.message
-                    # print(leader_addr)
                     leader_ip_idx = int(leader_addr[-1])
-                    # print(leader_ip_idx)
                     print(f'Redirecting to leader at {ip_list[leader_ip_idx]}\n')
                 except:
                     print("Invalid leader info in response:", response)
                     break
             else:
                 print("Operation failed:", response)
-                break  # Fail without leader info, exit loop
+                break
 
         except grpc.RpcError as e:
             print(f"Failed to connect to {addr}: {e}")
-            # Move to the next server in the list if there's a connection issue
             _, leader_ip_idx = get_next_leader_ip(ip_list, leader_ip_idx)
 
 if __name__ == "__main__":
