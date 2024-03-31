@@ -277,12 +277,6 @@ class Node():
                             heartbeat_recieved[int(follower[-1])] = False
                             write_to_dump(f'Error occurred while sending RPC to Node {follower[-1]}.\n', self.log_dir)
                             continue
-                    else:
-                        for index in range(len(self.fellow)):
-                            if self.fellow[index] == follower:
-                                self.fellow.pop(index)
-                                print('Server {} lost connect'.format(follower))
-                                break
                 except:
                     continue
         except:
@@ -342,17 +336,16 @@ class Node():
                 time.sleep(delta)
 
     def handle_get(self, payload):
-        print(f'Get: {payload}\n')
         key = payload["key"]
         act = payload["act"]
         if act == 'get':
             cache_res = self.cache.get(key)
             if cache_res is not None:
-                print('result in cache')
+                print('Given result from cache to client\n')
                 payload["value"] = cache_res
                 return payload
             elif key in self.DB:
-                print('result in db')
+                print('Given result from DB to client\n')
                 payload["value"] = self.DB[key]
                 return payload
         return None
@@ -403,7 +396,7 @@ class Node():
             waited += 0.0010
             time.sleep(0.0005)
             if waited > MAX_LOG_WAIT / 1000:
-                print(f"waited {MAX_LOG_WAIT} ms, update rejected:")
+                print(f'Waited for {MAX_LOG_WAIT} ms, update rejected\n')
                 self.lock.release()
                 return False
         commit_message = {
@@ -416,7 +409,7 @@ class Node():
         can_delete = self.commit()
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
-        print("majority reached, replied to client, sending message to commit, message:", commit_message)
+        print(f'Majority reached, Replied to client, Sending message to commit, Commit message: {commit_message}\n')
         write_to_dump(f"Node {self.addr[-1]} (leader) committed the entry SET {payload['key']} {payload['value']} to the state machine.\n", self.log_dir)
         write_to_log(f"SET {payload['key']} {payload['value']} {self.term}\n", self.log_dir)
         write_to_metadata(f"log[] - {self.term} SET {payload['key']} {payload['value']}\n", self.log_dir)
