@@ -16,8 +16,6 @@ class Raft(raft_pb2_grpc.RaftServicer):
         return response
 
     def PutRequest(self, request, context):
-        #type = request.type
-        #print('putting, request = ',request)
         payload = {'act':None,'key':None,'value':None}
         payload['act'] = request.payload.act
         payload['key'] = request.payload.key
@@ -25,7 +23,6 @@ class Raft(raft_pb2_grpc.RaftServicer):
         response = raft_pb2.PutReply()
         response.code = 'fail'
         if n.status == LEADER:
-            #print('getting, request = ', request)
             result = n.handle_put(payload)
             if result:
                 response.code='success'
@@ -36,11 +33,9 @@ class Raft(raft_pb2_grpc.RaftServicer):
             response.payload.key = payload['key']
             response.payload.value = payload['value']
 
-        # print('put response:',response)
         return response
 
     def GetRequest(self, request, context):
-        # print('getting, request = ',request)
         payload = {'act': None, 'key': None,'value':None}
         payload['act'] = request.payload.act
         payload['key'] = request.payload.key
@@ -48,7 +43,6 @@ class Raft(raft_pb2_grpc.RaftServicer):
         response = raft_pb2.GetReply()
         response.code = 'fail'
         if n.status == LEADER:
-            #print('getting, request = ', request)
             result = n.handle_get(payload)
             if result and result['value']:
                 response.code = 'success'
@@ -62,7 +56,6 @@ class Raft(raft_pb2_grpc.RaftServicer):
             response.payload.act = payload['act']
             response.payload.key = payload['key']
             response.payload.value = payload['value']
-        #print('get response:',response)
 
         return response
 
@@ -73,14 +66,11 @@ class Raft(raft_pb2_grpc.RaftServicer):
         staged['act'] = request.staged.act
         staged['key'] = request.staged.key
         staged['value'] = request.staged.value
-        #debugger (str(term)+str(commitIdx)+str(staged))
         choice, term = n.decide_vote(term, commitIdx, staged)
-        #print(choice,term)
         message = raft_pb2.VoteReply(choice=choice,term=term)
         return message
 
     def AppendEntries(self, request, context):
-        #print('Procedure heart beat')
         lease_expiry = request.lease_expiry
         msg = {
             'term':request.term,
@@ -97,7 +87,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
             msg['action'] = request.action
         if request.commitIdx:
             msg['commitIdx'] = request.commitIdx
-        term,commitIdx = n.heartbeat_follower(msg)
+        term, commitIdx = n.heartbeat_follower(msg)
         reply = raft_pb2.AEReply()
         reply.term = term
         reply.commitIdx = commitIdx
