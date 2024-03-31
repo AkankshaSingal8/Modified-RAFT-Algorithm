@@ -187,7 +187,6 @@ class Node():
                     choice = reply.choice
                     if choice and self.status == CANDIDATE:
                         log_dir = f'./logs_node_{voter[-1]}'
-                        print(log_dir)
                         write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', log_dir)
                         write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {term}\n', log_dir)
                         self.incrementVote(term)
