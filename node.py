@@ -80,7 +80,7 @@ class Node():
         self.vote_requests_sent = set()
         self.log_dir = f'./logs_node_{self.addr[-1]}'
         self.uncommited_list = uncommited_list
-        self.load_from_log(log_list, uncommited_list)
+        # self.load_from_log(log_list, uncommited_list)
         self.lease_expiry = 0
         self.heartbeat_recieved = [False] * len(self.fellow)
         self.lease_expiry_list = [False] * len(self.fellow)
@@ -228,18 +228,19 @@ class Node():
 
     def update_follower_commitIdx(self, follower):
         try:
-            channel = grpc.insecure_channel(follower)
-            stub = raft_pb2_grpc.RaftStub(channel)
-            message = raft_pb2.AEMessage()
-            message.term = self.term
-            message.addr = self.addr
-            message.action = 'commit'
-            message.payload.act = self.log[-1]['act']
-            message.payload.key = self.log[-1]['key']
-            message.commitIdx = self.commitIdx
-            if self.log[-1]['value']:
-                message.payload.value = self.log[-1]['value']
-            reply = stub.AppendEntries(message)
+            for i in range(len(self.log)):
+                channel = grpc.insecure_channel(follower)
+                stub = raft_pb2_grpc.RaftStub(channel)
+                message = raft_pb2.AEMessage()
+                message.term = self.term
+                message.addr = self.addr
+                message.action = 'commit'
+                message.payload.act = self.log[i]['act']
+                message.payload.key = self.log[i]['key']
+                message.commitIdx = self.commitIdx
+                if self.log[-1]['value']:
+                    message.payload.value = self.log[i]['value']
+                reply = stub.AppendEntries(message)
         except:
             return
 
