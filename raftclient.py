@@ -60,7 +60,7 @@ def send_request(action, key, val, ip_list):
                     leader_ip_idx = int(leader_addr[-1])
                     print(f'Redirecting to leader at {ip_list[leader_ip_idx]}\n')
                 except:
-                    print("Invalid leader info in response:", response)
+                    print(F'Invalid leader info in response: {response.code}\n')
                     break
             else:
                 print("Operation failed:", response)
