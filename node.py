@@ -135,8 +135,6 @@ class Node():
                 self.lease_expiry_list = [False] * len(self.fellow)
                 print('Old Leader Lease timeout\n')
 
-    # increment only when we are candidate and receive positve vote
-    # change status to LEADER and start heartbeat as soon as we reach majority
     def incrementVote(self, term):
         self.voteCount += 1
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority and self.onServers() + 1 >= self.majority and self.acquire_lease():
@@ -151,8 +149,6 @@ class Node():
                 self.status = LEADER
                 self.startHeartBeat()
 
-    # vote for myself, increase term, change status to candidate
-    # reset the timeout and start sending request to followers
     def startElection(self):
         write_to_dump(f'Node {self.addr[-1]} election timer timed out, Starting election.\n', self.log_dir)
         self.term += 1
@@ -165,25 +161,14 @@ class Node():
         self.vote_requests_sent = set()
         self.send_vote_req()
 
-    # ------------------------------
-    # ELECTION TIME CANDIDATE
-
-    # spawn threads to request vote for all followers until get reply
     def send_vote_req(self):
-        # TODO: use map later for better performance
-        # we continue to ask to vote to the address that haven't voted yet
-        # till everyone has voted
-        # or I am the leader
         for voter in self.fellow:
             try:
                 threading.Thread(target=self.ask_for_vote, args=(voter, self.term)).start()
             except:
                 continue
 
-
-    # request vote to other servers during given election term
     def ask_for_vote(self, voter, term):
-        # need to include self.commitIdx, only up-to-date candidate could win
         channel = grpc.insecure_channel(voter)
         stub = raft_pb2_grpc.RaftStub(channel)
         message = raft_pb2.VoteMessage()
@@ -199,40 +184,24 @@ class Node():
                 reply = stub.RequestVote(message)
                 self.vote_requests_sent.add(voter)
                 if reply:
-                    # choice = reply.json()["choice"]
                     choice = reply.choice
-                    # print(f"RECEIVED VOTE {choice} from {voter} in term {term}")
                     if choice and self.status == CANDIDATE:
                         log_dir = f'./logs_node_{voter[-1]}'
                         write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', log_dir)
                         write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {term}\n', log_dir)
                         self.incrementVote(term)
                     elif not choice:
-                        # they declined because either I'm out-of-date or not newest term
-                        # update my term and terminate the vote_req
-                        #term = reply.json()["term"]
                         term = int(reply.term)
-                        # self.term = term
-                        # self.status = FOLLOWER
                         if term > self.term:
                             self.term = term
                             self.status = FOLLOWER
                         log_dir = f'./logs_node_{voter[-1]}'
                         write_to_dump(f'Vote declined for Node {self.addr[-1]} in term {term}\n', log_dir)    
-                        # fix out-of-date needed
                     break
             except:
                 continue
 
-    # ------------------------------
-    # ELECTION TIME FOLLOWER
-
-    # some other server is asking
     def decide_vote(self, term, commitIdx, staged):
-        # new election
-        # decline all non-up-to-date candidate's vote request as well
-        # but update term all the time, not reset timeout during decision
-        # also vote for someone that has our staged version or a more updated one
         if self.term < term and self.commitIdx <= commitIdx and (
                 staged or (self.staged == staged)):
             self.reset_timeout()
@@ -241,15 +210,9 @@ class Node():
         else:
             return False, self.term
 
-    # ------------------------------
-    # START PRESIDENT
-
     def startHeartBeat(self):
-        #print("Starting HEARTBEAT")
         write_to_dump(f'Leader {self.addr[-1]} sending heartbeat & Renewing Lease\n', self.log_dir)
         if self.staged:
-            # we have something staged at the beginngin of our leadership
-            # we consider it as a new payload just received and spread it aorund
             self.handle_put(self.staged)
         self.heartbeat_recieved = [False] * len(self.fellow)
         self.heartbeat_recieved[int(self.addr[-1])] = True
@@ -277,7 +240,6 @@ class Node():
             return        
 
     def send_heartbeat(self, follower, heartbeat_recieved):
-        # check if the new follower have same commit index, else we tell them to update to our log level
         try:
             if self.log:
                 self.update_follower_commitIdx(follower)
@@ -307,10 +269,8 @@ class Node():
                                 heartbeat_recieved[int(follower[-1])] = True
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
                             delta = time.time() - start
-                            # keep the heartbeat constant even if the network speed is varying
                             time.sleep((HB_TIME - delta) / 1000)
                             if sum(heartbeat_recieved) >= self.majority:
-                                #print(sum(heartbeat_recieved))
                                 if self.lease_expiry_list[int(self.addr[-1])] == True:
                                     self.lease_expiry = time.time() + LEASE_TIME / 1000
                         except:
@@ -328,10 +288,7 @@ class Node():
         except:
             return
 
-    # we may step down when get replied
     def heartbeat_reply_handler(self, term, commitIdx):
-        # i thought i was leader, but a follower told me
-        # that there is a new term, so i now step down
         if term > self.term:
             self.term = term
             self.status = FOLLOWER
@@ -342,58 +299,41 @@ class Node():
         self.election_time = time.time() + random_timeout()
 
     def heartbeat_follower(self, msg):
-        # weird case if 2 are PRESIDENT of same term.
-        # both receive an heartbeat
-        # we will both step down
-
         term = msg["term"]
         if self.term <= term:
             self.leader = msg["addr"]
             received_lease_expiry = msg['lease_expiry']
             self.lease_expiry = max(self.lease_expiry, received_lease_expiry)
             self.reset_timeout()
-            # in case I am not follower
-            # or started an election and lost it
             if self.status == CANDIDATE:
                 self.status = FOLLOWER
             elif self.status == LEADER:
                 self.status = FOLLOWER
                 write_to_dump(f'Leader {self.addr[-1]} Stepping Down.\n', self.log_dir)
                 self.init_timeout()
-            # i have missed a few messages
             if self.term < term:
                 self.term = term
-
-            # handle client request
             if "action" in msg:
-                print("received action", msg)
+                print(f'Received request: {msg}\n')
                 action = msg["action"]
-                # logging after first msg
                 if action == "log":
                     payload = msg["payload"]
                     self.staged = payload
-                    #print(self.staged)
-                # proceeding staged transaction
                 elif self.commitIdx <= msg["commitIdx"]:
-                    #print('update staged')
                     if not self.staged:
                         self.staged = msg["payload"]
                     write_to_dump(f'Node {self.addr[-1]} (follower) committed the entry SET {self.staged["key"]} {self.staged["value"]} to the state machine.\n', log_dir=f'./logs_node_{self.addr[-1]}')
                     self.commit()
         return self.term, self.commitIdx
 
-    # initiate timeout thread, or reset it
     def init_timeout(self):
         self.reset_timeout()
-        # safety guarantee, timeout thread may expire after election
         if self.timeout_thread and self.timeout_thread.is_alive():
             return
         self.timeout_thread = threading.Thread(target=self.timeout_loop)
         self.timeout_thread.start()
 
-    # the timeout function
     def timeout_loop(self):
-        # only stop timeout thread when winning the election
         while self.status != LEADER:
             delta = self.election_time - time.time()
             if delta < 0:
@@ -417,8 +357,6 @@ class Node():
                 return payload
         return None
 
-    # takes a message and an array of confirmations and spreads it to the followers
-    # if it is a comit it releases the lock
     def spread_update(self, message, confirmations=None, lock=None):
         for i, each in enumerate(self.fellow):
             try:
@@ -428,17 +366,14 @@ class Node():
                 m.term = message['term']
                 m.addr = message['addr']
                 if message['payload'] is not None:
-                    #print(message['payload'])
                     m.payload.act = message['payload']['act']
                     m.payload.key = message['payload']['key']
                     m.payload.value = message['payload']['value']
-                #m.action = 'commit'
                 if message['action']:
                     m.action = message['action']
                 m.commitIdx = self.commitIdx
                 r = stub.AppendEntries(m)
                 if r and confirmations:
-                    # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
                 else:
                     write_to_dump(f"Node {i} rejected AppendEntries RPC from {self.addr[-1]}\n", log_dir=f'./logs_node_{i}')
@@ -449,8 +384,6 @@ class Node():
             lock.release()
 
     def handle_put(self, payload):
-        #print("putting", payload)
-        # lock to only handle one request at a time
         self.lock.acquire()
         self.staged = payload
         waited = 0
@@ -463,7 +396,6 @@ class Node():
         }
 
         write_to_dump(f"Node {self.addr[-1]} (leader) received a SET {payload['key']} {payload['value']} request.\n", self.log_dir)
-        # spread log  to everyone
         log_confirmations = [False] * len(self.fellow)
         threading.Thread(target=self.spread_update,
                          args=(log_message, log_confirmations)).start()
@@ -474,7 +406,6 @@ class Node():
                 print(f"waited {MAX_LOG_WAIT} ms, update rejected:")
                 self.lock.release()
                 return False
-        # reach this point only if a majority has replied and tell everyone to commit
         commit_message = {
             "term": self.term,
             "addr": self.addr,
@@ -482,7 +413,6 @@ class Node():
             "action": "commit",
             "commitIdx": self.commitIdx
         }
-        #print('commit to all')
         can_delete = self.commit()
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
@@ -492,7 +422,6 @@ class Node():
         write_to_metadata(f"log[] - {self.term} SET {payload['key']} {payload['value']}\n", self.log_dir)
         return can_delete
 
-    # put staged key-value pair into local database
     def commit(self):
         self.commitIdx += 1
         self.log.append(self.staged)
@@ -501,21 +430,13 @@ class Node():
         value = None
         can_delete = True
         cache_update = False
-        #if self.staged['value'] == 'None':
-        #    self.DB[key]= None
-        #    key = None
-        #    can_delete = False
         if act == 'set':
-            #print('it\'s a put transaction')
             value = self.staged["value"]
             self.DB[key] = value
             cache_update = True
         if cache_update:
             self.cache.set(key, value)
             self.cache.printcache()
-        # put newly inserted key-value pair into local cache
-
-        # empty the staged so we can vote accordingly if there is a tie
         self.staged = None
         log_dir = f'./logs_node_{self.addr[-1]}'
         write_to_log(f"SET {key} {value} {self.term}\n", log_dir)
