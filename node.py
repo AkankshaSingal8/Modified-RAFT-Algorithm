@@ -138,6 +138,7 @@ class Node():
     # change status to LEADER and start heartbeat as soon as we reach majority
     def incrementVote(self, term):
         self.voteCount += 1
+        
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority and self.onServers() + 1 >= self.majority and self.acquire_lease():
             log_entry = f'NO-OP {self.term}\n'
             if not self.log_contains_entry(log_entry):
@@ -203,6 +204,7 @@ class Node():
                     if choice and self.status == CANDIDATE:
                         log_dir = f'./logs_node_{voter[-1]}'
                         write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', log_dir)
+                        write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {term}\n', log_dir)
                         self.incrementVote(term)
                     elif not choice:
                         # they declined because either I'm out-of-date or not newest term
@@ -214,6 +216,8 @@ class Node():
                         if term > self.term:
                             self.term = term
                             self.status = FOLLOWER
+                        log_dir = f'./logs_node_{voter[-1]}'
+                        write_to_dump(f'Vote declined for Node {self.addr[-1]} in term {term}\n', log_dir)    
                         # fix out-of-date needed
                     break
             except:
@@ -329,6 +333,7 @@ class Node():
         if term > self.term:
             self.term = term
             self.status = FOLLOWER
+            write_to_dump(f'Leader {self.addr[-1]} Stepping Down.\n', self.log_dir)
             self.init_timeout()
 
     def reset_timeout(self):
@@ -351,6 +356,7 @@ class Node():
                 self.status = FOLLOWER
             elif self.status == LEADER:
                 self.status = FOLLOWER
+                write_to_dump(f'Leader {self.addr[-1]} Stepping Down.\n', self.log_dir)
                 self.init_timeout()
             # i have missed a few messages
             if self.term < term:
@@ -432,7 +438,10 @@ class Node():
                 if r and confirmations:
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
+                else:
+                    write_to_dump(f"Node {i}  rejected AppendEntries RPC from {self.addr}\n", log_dir=f'./logs_node_{each[-1]}')
             except:
+                
                 write_to_dump(f"uncommitedEntry - {self.commitIdx} SET {m.payload.key} {m.payload.value}\n", log_dir=f'./logs_node_{each[-1]}')
                 continue
         if lock:
