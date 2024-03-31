@@ -229,6 +229,7 @@ class Node():
     def update_follower_commitIdx(self, follower):
         try:
             for i in range(len(self.log)):
+                print(i)
                 channel = grpc.insecure_channel(follower)
                 stub = raft_pb2_grpc.RaftStub(channel)
                 message = raft_pb2.AEMessage()
