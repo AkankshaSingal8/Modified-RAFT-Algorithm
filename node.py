@@ -299,6 +299,9 @@ class Node():
                             if reply:
                                 heartbeat_recieved[int(follower[-1])] = True
                                 self.heartbeat_reply_handler(reply.term, reply.commitIdx)
+                                successful_communications += 1
+
+
                             delta = time.time() - start
                             # keep the heartbeat constant even if the network speed is varying
                             time.sleep((HB_TIME - delta) / 1000)
@@ -454,7 +457,7 @@ class Node():
         threading.Thread(target=self.spread_update,
                          args=(log_message, log_confirmations)).start()
         while sum(log_confirmations) + 1 < self.majority:
-            waited += 0.0005
+            waited += 0.0010
             time.sleep(0.0005)
             if waited > MAX_LOG_WAIT / 1000:
                 print(f"waited {MAX_LOG_WAIT} ms, update rejected:")
