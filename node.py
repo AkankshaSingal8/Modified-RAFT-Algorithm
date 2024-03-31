@@ -139,7 +139,6 @@ class Node():
     # change status to LEADER and start heartbeat as soon as we reach majority
     def incrementVote(self, term):
         self.voteCount += 1
-        
         if self.status == CANDIDATE and self.term == term and self.voteCount >= self.majority and self.onServers() + 1 >= self.majority and self.acquire_lease():
             log_entry = f'NO-OP {self.term}\n'
             if not self.log_contains_entry(log_entry):
@@ -160,6 +159,7 @@ class Node():
         self.voteCount = 0
         self.status = CANDIDATE
         self.init_timeout()
+        write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {self.term}\n', self.log_dir)
         write_to_metadata(f'votedFor - {self.term} {self.addr[-1]}\n', self.log_dir)
         self.incrementVote(self.term)
         self.vote_requests_sent = set()
@@ -378,9 +378,8 @@ class Node():
                     #print('update staged')
                     if not self.staged:
                         self.staged = msg["payload"]
-                    write_to_dump(f'Node {self.addr[-1]} (follower) committed the entry SET {self.staged["key"]} {self.staged["value"]} to the state machine.\n', log_dir=f'./logs_node_{each[-1]}')
+                    write_to_dump(f'Node {self.addr[-1]} (follower) committed the entry SET {self.staged["key"]} {self.staged["value"]} to the state machine.\n', log_dir=f'./logs_node_{self.addr[-1]}')
                     self.commit()
-
         return self.term, self.commitIdx
 
     # initiate timeout thread, or reset it
