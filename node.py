@@ -228,8 +228,8 @@ class Node():
 
     def update_follower_commitIdx(self, follower):
         try:
+            print(self.log)
             for i in range(len(self.log)):
-                print(i)
                 channel = grpc.insecure_channel(follower)
                 stub = raft_pb2_grpc.RaftStub(channel)
                 message = raft_pb2.AEMessage()
@@ -239,7 +239,7 @@ class Node():
                 message.payload.act = self.log[i]['act']
                 message.payload.key = self.log[i]['key']
                 message.commitIdx = self.commitIdx
-                if self.log[-1]['value']:
+                if self.log[i]['value']:
                     message.payload.value = self.log[i]['value']
                 reply = stub.AppendEntries(message)
         except:
