@@ -123,6 +123,7 @@ if __name__ == "__main__":
         log_lines = []
         ip_list = []
         uncommited_list = []
+        votedFor_line = ""
         with open("ip_list.txt") as f:
             for ip in f:
                 ip_list.append(ip.strip())
@@ -145,7 +146,8 @@ if __name__ == "__main__":
                         votedFor_line = line.strip()
                     if "log[]" in line:
                         log_lines.append(line.strip())
-            term = votedFor_line.split()[2]
+            if votedFor_line != "":
+                term = votedFor_line.split()[2]
         if os.path.exists(os.path.join(log_directory, 'dump.txt')):
             with open(os.path.join(log_directory, 'dump.txt'), 'r') as f:
                 for line in f:
