@@ -4,3 +4,12 @@ NO-OP 1
 SET 1 5 1
 SET 2 6 1
 SET 3 7 1
+SET Starting election. 2
+SET to timeout. 2
+SET term 2. 2
+SET Renewing Lease 2
+NO-OP 4
+NO-OP 4
+SET 1 5 4
+SET 2 6 4
+SET 3 7 4

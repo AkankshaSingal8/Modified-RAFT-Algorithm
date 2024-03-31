@@ -4,3 +4,7 @@ log[] - 1 SET 2 6
 log[] - 1 SET 3 7
 votedFor - 2 1
 log[] - 2 SET 3 7
+votedFor - 4 0
+log[] - 4 SET 1 5
+log[] - 4 SET 2 6
+log[] - 4 SET 3 7

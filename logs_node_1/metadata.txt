@@ -3,3 +3,12 @@ log[] - 1 SET 1 5
 log[] - 1 SET 2 6
 log[] - 1 SET 3 7
 votedFor - 2 1
+log[] - 2 SET Starting election.
+log[] - 2 SET to timeout.
+log[] - 2 SET term 2.
+log[] - 2 SET Renewing Lease
+votedFor - 3 1
+votedFor - 4 0
+log[] - 4 SET 1 5
+log[] - 4 SET 2 6
+log[] - 4 SET 3 7

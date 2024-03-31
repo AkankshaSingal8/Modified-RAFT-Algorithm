@@ -1,0 +1,4 @@
+Vote granted for Node 0 in term 4
+Node 2  rejected AppendEntries RPC from 127.0.0.1:5000
+Node 2  rejected AppendEntries RPC from 127.0.0.1:5000
+Node 2  rejected AppendEntries RPC from 127.0.0.1:5000

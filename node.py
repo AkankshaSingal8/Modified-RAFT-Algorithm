@@ -439,7 +439,7 @@ class Node():
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
                 else:
-                    write_to_dump(f"Node {i}  rejected AppendEntries RPC from {self.addr}\n", log_dir=f'./logs_node_{each[-1]}')
+                    write_to_dump(f"Node {i}  rejected AppendEntries RPC from {self.addr[-1]}\n", log_dir=f'./logs_node_{each[-1]}')
             except:
                 
                 write_to_dump(f"uncommitedEntry - {self.commitIdx} SET {m.payload.key} {m.payload.value}\n", log_dir=f'./logs_node_{each[-1]}')
