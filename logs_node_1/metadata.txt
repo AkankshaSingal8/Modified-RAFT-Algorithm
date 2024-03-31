@@ -1,5 +1,0 @@
-votedFor - 1 0
-log[] - 1 SET 1 5
-log[] - 1 SET 2 6
-log[] - 1 SET 3 7
-votedFor - 2 1

@@ -1,6 +1,0 @@
-Node 1 election timer timed out, Starting election.
-New Leader waiting for Old Leader Lease to timeout.
-Node 1 became the leader for term 2.
-Node 1 became the leader for term 2.
-Leader 1 sending heartbeat & Renewing Lease
-Leader 1 sending heartbeat & Renewing Lease

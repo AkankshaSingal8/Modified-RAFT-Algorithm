@@ -97,6 +97,7 @@ class Node():
             except:
                 continue
         return count
+
     def log_contains_entry(self, entry):
         log_file_path = os.path.join(self.log_dir, 'logs.txt')
         if not os.path.exists(log_file_path):
@@ -310,6 +311,7 @@ class Node():
                                     self.lease_expiry = time.time() + LEASE_TIME / 1000
                         except:
                             heartbeat_recieved[int(follower[-1])] = False
+                            write_to_dump(f'Error occurred while sending RPC to Node {follower[-1]}.\n', self.log_dir)
                             continue
                     else:
                         for index in range(len(self.fellow)):
@@ -370,6 +372,7 @@ class Node():
                     #print('update staged')
                     if not self.staged:
                         self.staged = msg["payload"]
+                    write_to_dump(f'Node {self.addr[-1]} (follower) committed the entry SET {self.staged["key"]} {self.staged["value"]} to the state machine.\n', log_dir=f'./logs_node_{each[-1]}')
                     self.commit()
 
         return self.term, self.commitIdx
@@ -432,6 +435,7 @@ class Node():
                 if r and confirmations:
                     # print(f" - - {message['action']} by {each}")
                     confirmations[i] = True
+                    write_to_dump(f'Node {each[-1]} accepted AppendEntries RPC from {self.addr[-1]}.\n', log_dir=f'./logs_node_{each[-1]}')
             except:
                 write_to_dump(f"uncommitedEntry - {self.commitIdx} SET {m.payload.key} {m.payload.value}\n", log_dir=f'./logs_node_{each[-1]}')
                 continue
@@ -452,6 +456,7 @@ class Node():
             "commitIdx": self.commitIdx
         }
 
+        write_to_dump(f"Node {self.addr[-1]} (leader) received a SET {payload['key']} {payload['value']} request.\n", self.log_dir)
         # spread log  to everyone
         log_confirmations = [False] * len(self.fellow)
         threading.Thread(target=self.spread_update,
@@ -476,6 +481,7 @@ class Node():
         threading.Thread(target=self.spread_update,
                          args=(commit_message, None, self.lock)).start()
         print("majority reached, replied to client, sending message to commit, message:", commit_message)
+        write_to_dump(f"Node {self.addr[-1]} (leader) committed the entry SET {payload['key']} {payload['value']} to the state machine.\n", self.log_dir)
         write_to_log(f"SET {payload['key']} {payload['value']} {self.term}\n", self.log_dir)
         write_to_metadata(f"log[] - {self.term} SET {payload['key']} {payload['value']}\n", self.log_dir)
         return can_delete
