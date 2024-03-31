@@ -64,6 +64,7 @@ message VoteMessage{
 		 string value = 3;
 	}
 	 Staged staged = 3;
+	 string LeaderID = 4;
 }
 
 message VoteReply{

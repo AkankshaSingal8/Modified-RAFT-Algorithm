@@ -155,7 +155,7 @@ class Node():
         self.voteCount = 0
         self.status = CANDIDATE
         self.init_timeout()
-        # print(self.log_dir)
+        print(self.log_dir)
         write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {self.term}\n', self.log_dir)
         write_to_metadata(f'votedFor - {self.term} {self.addr[-1]}\n', self.log_dir)
         self.incrementVote(self.term)
@@ -175,6 +175,7 @@ class Node():
         message = raft_pb2.VoteMessage()
         message.term = term
         message.commitIdx = self.commitIdx
+        message.LeaderID = self.addr[-1]
         if self.staged:
             message.staged.act = self.staged['act']
             message.staged.key = self.staged['key']
@@ -187,36 +188,34 @@ class Node():
                 if reply:
                     choice = reply.choice
                     if choice and self.status == CANDIDATE:
-                        log_dir = f'./logs_node_{voter[-1]}'
+                        # log_dir = f'./logs_node_{voter[-1]}'
                         # print(log_dir)
-                        write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', log_dir)
-                        write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {term}\n', log_dir)
+                        # write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', log_dir)
+                        # write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {term}\n', log_dir)
                         self.incrementVote(term)
                     elif not choice:
                         term = int(reply.term)
                         if term > self.term:
                             self.term = term
                             self.status = FOLLOWER
-                        log_dir = f'./logs_node_{voter[-1]}'
-                        write_to_dump(f'Vote declined for Node {self.addr[-1]} in term {term}\n', log_dir)    
+                        # log_dir = f'./logs_node_{voter[-1]}'
+                        # write_to_dump(f'Vote declined for Node {self.addr[-1]} in term {term}\n', log_dir)    
                     break
             except:
                 continue
 
-    def decide_vote(self, term, commitIdx, staged):
+    def decide_vote(self, term, commitIdx, staged, leaderId):
         if self.term < term and self.commitIdx <= commitIdx and (
                 staged or (self.staged == staged)):
             self.reset_timeout()
             self.term = term
-            granted = True
-            
+            write_to_metadata(f'votedFor - {term} {leaderId}\n', self.log_dir)
+            write_to_dump(f'Vote granted for Node {leaderId} in term {term}\n', self.log_dir)
+            return True, self.term
         else:
+            write_to_dump(f'Vote declined for Node {leaderId} in term {term}\n', self.log_dir)
             return False, self.term
 
-        write_to_metadata(f'votedFor - {term} {self.addr[-1]}\n', self.log_dir)
-        write_to_dump(f'Vote granted for Node {self.addr[-1]} in term {term}\n', self.log_dir)
-        # print(self.log_dir)
-        return granted, self.term
     def startHeartBeat(self):
         write_to_dump(f'Leader {self.addr[-1]} sending heartbeat & Renewing Lease\n', self.log_dir)
         if self.staged:

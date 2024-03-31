@@ -62,11 +62,12 @@ class Raft(raft_pb2_grpc.RaftServicer):
     def RequestVote(self, request, context):
         term = request.term
         commitIdx = request.commitIdx
+        leaderId = request.LeaderID
         staged = {'act': None, 'key': None, 'value': None}
         staged['act'] = request.staged.act
         staged['key'] = request.staged.key
         staged['value'] = request.staged.value
-        choice, term = n.decide_vote(term, commitIdx, staged)
+        choice, term = n.decide_vote(term, commitIdx, staged, leaderId)
         message = raft_pb2.VoteReply(choice=choice,term=term)
         return message
 
